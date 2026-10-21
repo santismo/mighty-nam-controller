@@ -23,7 +23,7 @@ export function editingBluetooth(options={}){
   const words=statusWords(),effects=chainFrame().slice(7,-1),bank=Array.from({length:7},(_,i)=>header(i,effects));
   let generation=0,saveCount=0,writeCount=0;const requests=[],writes=[],methods=[];
   const characteristic=new EventTarget();characteristic.properties={notify:true,write:true,writeWithoutResponse:true};characteristic.startNotifications=async()=>characteristic;
-  const reply=frame=>queueMicrotask(()=>{for(const packet of encodeSysEx(frame,0)){characteristic.value=packet.buffer;characteristic.dispatchEvent(new Event('characteristicvaluechanged'));}});
+  const reply=frame=>queueMicrotask(()=>{for(const packet of encodeSysEx(frame,0,options.replyMtu??20)){characteristic.value=packet.buffer;characteristic.dispatchEvent(new Event('characteristicvaluechanged'));}});
   const decoder=new SysExDecoder(frame=>{
     const m=[...frame];requests.push(m);options.onRequest?.(m,{words,effects,bank});
     if(m.length===5){reply(identityFrame());return;}
@@ -41,7 +41,11 @@ export function editingBluetooth(options={}){
       }
       options.onPreset?.(op,slot,{words,effects,bank});
       if(op===2&&options.dropSaveReply)return;
-      reply(presetFrame(m,bank[slot],words[25]&255,127,error));return;
+      if(op===1&&options.dropPresetReply)return;
+      const frame=presetFrame(m,bank[slot],words[25]&255,127,error);
+      // Observed Bluetooth failure: five prefix bytes plus bytes 256 onward.
+      // This turns a 326-byte reply into a complete but invalid 75-byte frame.
+      reply(options.truncatedPresetReply?[...frame.slice(0,5),...frame.slice(256)]:frame);return;
     }
     if(m[7]===85){if(m[9]===1)generation++;reply(tunerFrame(m,{generation:generation+(options.changedTuner&&m[10]===3?1:0),error:m[9]===1&&words[23]?3:0,frequency:options.frequency??110}));return;}
     throw new Error(`Unexpected request: ${m}`);

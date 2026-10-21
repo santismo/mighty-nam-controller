@@ -1,9 +1,13 @@
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.3.0';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.3.0';
-import { detectPitch } from './tuner.js?v=0.3.0';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.3.1';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.3.1';
+import { detectPitch } from './tuner.js?v=0.3.1';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
-  constructor(link){this.link=link;this.bank=[];this.nonce=(Date.now()>>>0)||1;}
+  constructor(link){this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
+  resetBank(){this.bank=[];this.largeReplies=null;this.bankWarning='';}
+  requireLargeReplies(){
+    if(this.largeReplies===false)throw new Error('Preset selection, saving and tuner are unavailable over this Bluetooth connection. Use live controls or the Mac app.');
+  }
   token(){this.nonce=(this.nonce+1)>>>0;if(!this.nonce)this.nonce=1;return this.nonce;}
   async run(action){
     if(this.link.busy)throw new Error('Wait for the current operation.');
@@ -12,12 +16,42 @@ export class PlugEditor {
     try{return await action();}finally{if(epoch===this.link.epoch)this.link.busy=false;}
   }
   async preset(op,slot,body=[]){
+    if(op!==1)this.requireLargeReplies();
     const wire=presetRequest(op,slot,this.token(),body);
-    const result=await this.link.request(wire,m=>presetReply(m,wire),`${op===1?'Reading':op===2?'Saving':'Loading'} preset ${slot+1}`,{mutation:op!==1,timeout:op===2?20000:this.link.timeout});
+    const result=await this.link.request(wire,m=>{
+      const parsed=presetReply(m,wire);
+      if(parsed!==null)return parsed;
+      // NAMLNK12 can emit a 75-byte Bluetooth reply containing only the
+      // first five bytes and the tail (offset 256) of the 326-byte reply.
+      // It has already lost data before reaching the browser. Never try to
+      // reconstruct preset metadata or treat this frame as an acknowledgement.
+      if(m.length===75&&same(m.slice(0,5),[240,67,88,112,4])&&m.at(-1)===247)return {truncated:true};
+      return null;
+    },`${op===1?'Reading':op===2?'Saving':'Loading'} preset ${slot+1}`,{mutation:op!==1,timeout:op===2?20000:this.link.timeout});
+    if(result.truncated){
+      this.link.record('Incomplete preset reply: 75 of 326 MIDI bytes; large Bluetooth replies unavailable.');
+      throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
+    }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
     this.bank[slot]=result;return result;
   }
-  readBank(){return this.run(async()=>{for(let slot=0;slot<7;slot++)await this.preset(1,slot);return this.bank;});}
+  readBank(){return this.run(async()=>{
+    this.resetBank();
+    try{
+      for(let slot=0;slot<7;slot++)await this.preset(1,slot);
+      this.largeReplies=true;this.link.progress('Ready');return this.bank;
+    }catch(error){
+      this.bank=[];
+      if(!['reply-timeout','large-reply-truncated'].includes(error.code)||!this.link.connected||this.link.writeStalled)throw error;
+      this.largeReplies=false;
+      this.link.record(`Preset metadata unavailable: ${error.message}`);
+      // This was a read-only query. Verify the small-reply path and current
+      // preset again before allowing live controls to continue.
+      await this.link.snapshot();
+      this.bankWarning='Saved preset details could not be read. You can still adjust effects, buffer, and output. Use the plug’s preset button, then Refresh. Saving and tuner are unavailable in this session; use the Mac app.';
+      this.link.progress('Ready — live controls');return null;
+    }
+  });}
   async current(expected){
     const now=await this.link.snapshot();
     if(now.active!==expected.active||now.modelCrc!==expected.modelCrc||now.buffer!==expected.buffer||!same(now.effects,expected.effects))throw new Error('The plug changed since this page was read. Refresh before applying edits.');
@@ -66,12 +100,14 @@ export class PlugEditor {
     }
   });}
   recall(slot){return this.run(async()=>{
+    this.requireLargeReplies();
     const meta=await this.preset(1,slot);if(!meta.occupied)throw new Error('This preset is empty.');
     const recalled=await this.preset(3,slot),state=await this.link.snapshot();
     if(recalled.active!==slot||state.active!==slot||state.modelCrc!==recalled.modelCrc||state.buffer!==recalled.buffer||!same(state.effects,recalled.effects)||state.faults||!state.running)throw new Error('Preset recall was not confirmed. Refresh the plug.');
     return state;
   });}
   save(expected,effects,buffer,name){return this.run(async()=>{
+    this.requireLargeReplies();
     // Fetch the current slot before any writes. Only preserve a known onboard
     // capture; never guess its SHA or overwrite another color's model.
     const before=await this.preset(1,expected.active);
@@ -89,6 +125,7 @@ export class PlugEditor {
     const after=await this.link.snapshot();if(after.listening!==enabled)throw new Error('Plug output state was not confirmed.');return after;
   });}
   tune(reference=440){return this.run(async()=>{
+    this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');
     if((await this.link.readPage(23))&1)throw new Error('Mute was not confirmed.');

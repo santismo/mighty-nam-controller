@@ -9,3 +9,5 @@ input,select{font:inherit;color:var(--text);border:1px solid var(--line);border-
 @media(max-width:680px){.preset-editor{padding:0 17px 20px}.parameters{grid-template-columns:1fr;gap:16px}.chain-heading{flex-direction:column;gap:7px}.device-actions{gap:7px}.metrics select{font-size:11px;padding:4px}.metrics>div{padding-left:7px}.metrics{gap:6px}.metrics dd{font-size:11px}.device-actions .secondary-button{padding:0 12px}dialog{padding:18px}.block-detail{gap:16px}.preset-editor input{font-size:16px}}
 
 .presets .preset{background:#202225}.presets .preset.active{background:#2c2e31}
+
+#feature-notice{margin:0 0 24px}

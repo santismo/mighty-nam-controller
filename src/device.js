@@ -1,12 +1,12 @@
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.3.0';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.3.1';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.3.0';
-import { allowedCommand } from './commands.js?v=0.3.0';
-import { validateEffects } from './controls.js?v=0.3.0';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.3.1';
+import { allowedCommand } from './commands.js?v=0.3.1';
+import { validateEffects } from './controls.js?v=0.3.1';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
-const hex = bytes => [...bytes].slice(0, 64).map(b => b.toString(16).padStart(2, '0')).join(' ');
+const hex = bytes => [...bytes].slice(0, 512).map(b => b.toString(16).padStart(2, '0')).join(' ');
 
 export class PlugConnection extends EventTarget {
   constructor(bluetooth, timeout = 6500, settle = 300, spacing = 35) {
@@ -34,7 +34,7 @@ export class PlugConnection extends EventTarget {
   }
   progress(stage) { this.stage = stage; this.record(stage); this.dispatchEvent(new Event('progress')); }
   report() {
-    return `NAM Plug controller 0.3.0\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `NAM Plug controller 0.3.1\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {
@@ -143,9 +143,11 @@ export class PlugConnection extends EventTarget {
         timer: setTimeout(() => {
           this.writeStalled = !pending.writeDone;
           this.record(`Timeout: ${label}; write completed=${pending.writeDone}; notifications=${this.notifications}; MIDI replies=${this.frames}`);
-          finish(reject, new Error(pending.writeDone
+          const error = new Error(pending.writeDone
             ? `${label}: no matching reply. Bluetooth is still connected. Open Connection details.`
-            : `${label}: Bluetooth write did not finish. Open Connection details, then disconnect and reconnect.`));
+            : `${label}: Bluetooth write did not finish. Open Connection details, then disconnect and reconnect.`);
+          error.code = pending.writeDone ? 'reply-timeout' : 'write-timeout';
+          finish(reject, error);
         }, timeout)
       };
       this.pending = pending;

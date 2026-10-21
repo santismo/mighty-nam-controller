@@ -1,8 +1,8 @@
-import { PlugConnection } from './device.js?v=0.3.0';
-import { PlugEditor } from './editor.js?v=0.3.0';
-import { LiveEdits } from './live.js?v=0.3.0';
-import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.3.0';
-import { nameBytes } from './commands.js?v=0.3.0';
+import { PlugConnection } from './device.js?v=0.3.1';
+import { PlugEditor } from './editor.js?v=0.3.1';
+import { LiveEdits } from './live.js?v=0.3.1';
+import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.3.1';
+import { nameBytes } from './commands.js?v=0.3.1';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection);
 const blocks={
@@ -40,17 +40,19 @@ function status(){
   $('connect').textContent=connection.connected?'Disconnect':'Connect';$('connect').disabled=waiting||!navigator.bluetooth?.requestDevice;
   $('refresh').disabled=!connection.connected||waiting||connection.writeStalled;
   $('active-preset').textContent=ready?COLORS[snapshot.active]??'Unsaved':'—';
-  $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':savedMatches()?'Saved on plug':'Live · not saved';
+  $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||!editor.bank[snapshot?.active]?.occupied;
-  $('preset-name').disabled=!canEdit()||waiting;
+  $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
   $('buffer').disabled=!canEdit();$('buffer').value=String(buffer);
   $('listen').disabled=!ready||waiting||needsRefresh||$('tuner-dialog').open;
   $('listen').textContent=snapshot?.listening?'Mute plug':'Listen on plug';
-  $('tuner').disabled=!canEdit()||waiting;
+  $('tuner').disabled=!canEdit()||waiting||editor.largeReplies!==true;
+  $('feature-notice').hidden=!ready||!editor.bankWarning;
+  $('feature-notice').textContent=editor.bankWarning;
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.3.0 · ${snapshot.identity}`:'0.3.0';
+  $('version').textContent=ready?`0.3.1 · ${snapshot.identity}`:'0.3.1';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
@@ -63,7 +65,8 @@ function render(){
   $('presets').replaceChildren(...COLORS.map((color,index)=>{
     const item=el('li');const saved=editor.bank[index],active=ready&&snapshot.active===index;
     const b=button('',()=>recall(index),`${index+1}. ${color}${saved?.occupied?`, ${saved.name}`:''}${active?', active':''}`);
-    b.dataset.slot=index;b.className=`preset ${color.toLowerCase()}${saved?.occupied?' occupied':''}${active?' active':''}`;
+    const occupied=ready&&Boolean(snapshot.occupied&(1<<index));
+    b.dataset.slot=index;b.className=`preset ${color.toLowerCase()}${occupied?' occupied':''}${active?' active':''}`;
     if(active)b.setAttribute('aria-current','true');b.append(el('span',undefined,'swatch'),el('span',index+1));item.append(b);return item;
   }));
   $('empty-chain').hidden=ready;$('chain').hidden=!ready;
@@ -111,7 +114,7 @@ async function work(label,action){
   try{await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();}}
 }
-function clear(){operation++;busy=false;snapshot=null;effects=null;needsRefresh=false;editor.bank=[];live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('tuner-dialog').close();render();}
+function clear(){operation++;busy=false;snapshot=null;effects=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('tuner-dialog').close();render();}
 async function recall(slot){
   if(slot===snapshot?.active&&savedMatches())return;
   if(!savedMatches()&&!confirm('Switch preset and discard the unsaved changes?'))return;
@@ -119,9 +122,9 @@ async function recall(slot){
 }
 $('connect').addEventListener('click',async()=>{
   if(locked())return;if(connection.connected){clear();message('Disconnected.');return;}
-  await work('Choose your Mighty Plug Pro.',async()=>{const state=await connection.connect();accept(state);await editor.readBank();accept(state);message('Connected. Controls apply live; Save keeps your preset.');});
+  await work('Choose your Mighty Plug Pro.',async()=>{accept(await connection.connect());await editor.readBank();accept(connection.current);message(editor.bankWarning?'Connected. Live controls are ready.':'Connected. Controls apply live; Save keeps your preset.');});
 });
-$('refresh').addEventListener('click',()=>work('Reading the plug…',async()=>{const state=await connection.refresh();await editor.readBank();accept(state);message('Status updated.');}));
+$('refresh').addEventListener('click',()=>work('Reading the plug…',async()=>{await connection.refresh();await editor.readBank();accept(connection.current);message(editor.bankWarning?'Status updated. Live controls are ready.':'Status updated.');}));
 $('save').addEventListener('click',()=>{
   try{nameBytes($('preset-name').value);}catch(error){message(error.message,true);return;}
   work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value));message(`Saved to ${COLORS[snapshot.active]}. Plug muted.`);});
