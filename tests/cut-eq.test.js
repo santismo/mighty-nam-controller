@@ -20,10 +20,10 @@ test('cut EQ is visible and writable only on NAMLNK14; each filter has Off and b
  assert.equal(allowedCommand([176,4,68],true,{identity:'NAMLNK14',effects}),true);
  assert.throws(()=>validateEffects(updated,'NAMLNK13'));
 });
-test('cut EQ live controls, reorder, save and recall retain capture and both FX slots',async()=>{
- const fake=editingBluetooth({identity:'NAMLNK14'}),link=new PlugConnection(fake.bluetooth,1500,0,0),editor=new PlugEditor(link);
+for (const identity of ['NAMLNK14','NAMLNK15','NAMLNK16']) test(`${identity} cut EQ live controls, reorder, save and recall retain capture and both FX slots`,async()=>{
+ const fake=editingBluetooth({identity}),link=new PlugConnection(fake.bluetooth,1500,0,0),editor=new PlugEditor(link);
  await link.connect();await editor.readBank();const original=link.current;
- const effects=changeType(original.effects,4,4,'NAMLNK14');effects[4]=4;effects[36]=42;effects[37]=76;
+ const effects=changeType(original.effects,4,4,identity);effects[4]=4;effects[36]=42;effects[37]=76;
  const order=effects.slice(90,99).filter(x=>x!==4);effects.splice(90,9,4,...order);
  const state=await editor.apply(original,effects,8);assert.deepEqual(state.effects,effects);assert.equal(fake.saveCount,0);assert.equal(state.modelCrc,original.modelCrc);assert.deepEqual(state.fx,original.fx);
  await editor.save(state,effects,8,'Cuts');await editor.recall(1);await editor.recall(0);

@@ -30,7 +30,7 @@ export function editingBluetooth(options={}){
     const total=pageCache.length,count=Math.ceil(total/40);
     emit([240,67,88,112,4,2,78,82,1,pageGeneration&127,pageGeneration>>>7,index,count,total&127,total>>>7,...pageCache.slice(index*40,(index+1)*40),247]);
   };
-  const reply=frame=>{if(['NAMLNK13','NAMLNK14','NAMLNK15'].includes(options.identity)&&frame.length>64){pageCache=frame.slice(1,-1);pageGeneration=pageGeneration%16383+1;pageReply(0);}else emit(frame);};
+  const reply=frame=>{if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16'].includes(options.identity)&&frame.length>64){pageCache=frame.slice(1,-1);pageGeneration=pageGeneration%16383+1;pageReply(0);}else emit(frame);};
   const decoder=new SysExDecoder(frame=>{
     const m=[...frame];requests.push(m);options.onRequest?.(m,{words,effects,bank});
     if(m.length===5){reply(identityFrame(options.identity));return;}

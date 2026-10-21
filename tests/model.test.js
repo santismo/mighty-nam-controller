@@ -33,8 +33,8 @@ test('model wire is bounded and allowed only for NAMLNK14; replies require sessi
   assert.equal(modelReply(wire,q).capabilities,3);assert.equal(modelReply(wire,modelPacket(4,1)),null);wire[29]^=1;assert.equal(modelReply(wire,q),null);
 });
 const setup=async(options={})=>{const fake=editingBluetooth({identity:'NAMLNK14',...options}),link=new PlugConnection(fake.bluetooth,100,0,0),editor=new PlugEditor(link);await link.connect();await editor.readBank();return {fake,link,editor};};
-test('full BLE capture transfer checks every chunk, makes it active, bypasses cabinet, preserves FX and never saves',async()=>{
-  const {fake,link,editor}=await setup(),model=await fixtureModel(3),bank=fake.bank.map(x=>[...x]),extra=[...fake.extra],progress=[];fake.words[23]=1;
+for (const identity of ['NAMLNK14','NAMLNK15','NAMLNK16']) test(`${identity} BLE capture transfer activates, preserves FX and saves only on request`,async()=>{
+  const {fake,link,editor}=await setup({identity}),model=await fixtureModel(3),bank=fake.bank.map(x=>[...x]),extra=[...fake.extra],progress=[];fake.words[23]=1;
   const state=await editor.loadModel(link.current,model,{progress:n=>progress.push(n)});
   assert.equal(state.modelCrc,model.crc);assert.equal(state.listening,false);assert.equal(state.effects[3]&64,0);assert.equal(state.effects[9]&64,64);assert.deepEqual(state.fx,extra);assert.equal(progress.length,32);assert.equal(progress.at(-1),8192);assert.deepEqual(fake.bank.map(x=>[...x]),bank);assert.equal(fake.saveCount,0);assert.equal(editor.activeCapture.sha,model.sha);
   const next=await editor.saveCapture(state,state.effects,state.buffer,'New capture',3,model);assert.equal(next.active,3);assert.equal(fake.saveCount,1);assert.equal(editor.bank[3].name,'New capture');assert.equal(editor.bank[3].flags,1);
