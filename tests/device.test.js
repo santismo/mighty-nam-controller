@@ -11,7 +11,7 @@ for (const withoutResponse of [false, true]) test(`connect, refresh and disconne
   fake.words[24] += 8; assert.equal((await link.refresh()).buffer, 16);
   assert.ok(fake.requests.length >= 28); assert.ok(fake.requests.every(isReadOnlyRequest));
   assert.equal(fake.bluetooth.filters.filters[0].namePrefix, 'MIGHTY PLUG PRO');
-  await assert.rejects(link.request([176, 3, 1], () => null), /Only status reads/);
+  await assert.rejects(link.request([176, 3, 1], () => null), /Unsupported command/);
   link.close(); assert.equal(link.connected, false); assert.equal(link.pending, null);
   assert.equal((await link.connect()).buffer, 16); link.close();
 });

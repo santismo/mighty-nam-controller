@@ -1,6 +1,8 @@
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.2.0';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.3.0';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  isReadOnlyRequest, pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.2.0';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.3.0';
+import { allowedCommand } from './commands.js?v=0.3.0';
+import { validateEffects } from './controls.js?v=0.3.0';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -11,6 +13,7 @@ export class PlugConnection extends EventTarget {
     super(); this.bluetooth = bluetooth; this.timeout = timeout; this.settle = settle; this.spacing = spacing;
     this.epoch = 0; this.pending = null; this.busy = false; this.device = null; this.characteristic = null;
     this.ready = false; this.writeStalled = false; this.writeMethod = null; this.lastWrite = 0;
+    this.current = null;
     this.log = []; this.stage = 'Idle'; this.notifications = 0; this.frames = 0; this.started = Date.now();
     this.decoder = new SysExDecoder(message => this.receive(message));
     this.onValue = event => {
@@ -31,7 +34,7 @@ export class PlugConnection extends EventTarget {
   }
   progress(stage) { this.stage = stage; this.record(stage); this.dispatchEvent(new Event('progress')); }
   report() {
-    return `NAM Plug controller 0.2.0\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `NAM Plug controller 0.3.0\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {
@@ -76,6 +79,7 @@ export class PlugConnection extends EventTarget {
   close(log = true) {
     if (log) this.record('Disconnected by page');
     this.epoch++; this.busy = false; this.ready = false; this.writeStalled = false;
+    this.current = null;
     if (this.pending) this.pending.reject(new Error('Connection closed.'));
     this.decoder.reset();
     this.characteristic?.removeEventListener('characteristicvaluechanged', this.onValue);
@@ -89,6 +93,7 @@ export class PlugConnection extends EventTarget {
   receive(message) {
     this.frames++; this.record(`MIDI ${message.length} bytes: ${hex(message)}`);
     if (!this.pending) return;
+    if (!this.pending.parse) return;
     const value = this.pending.parse(message);
     if (value !== null) this.pending.match(value);
   }
@@ -112,13 +117,16 @@ export class PlugConnection extends EventTarget {
       } catch (error) {
         this.assertSession(epoch); if (this.pending !== pending) return;
         this.record(`Write rejected: ${method} — ${errorText(error)}`); failure = error;
-        if (!this.connected || ['SecurityError', 'NotAllowedError'].includes(error?.name)) break;
+        // Never retry a mutation with another transport method: acceptance may
+        // be ambiguous, and duplicate flash/preset operations are not safe.
+        if (pending.mutation || !this.connected || ['SecurityError', 'NotAllowedError'].includes(error?.name)) break;
       }
     }
     throw new Error(`${pending.label}: Bluetooth write rejected (${failure?.message || 'unsupported method'}). Open Connection details.`);
   }
-  async request(message, parse, label = 'Status read') {
-    if (!isReadOnlyRequest(message)) throw new Error('Only status reads are allowed.');
+  async request(message, parse, label = 'Status read', { mutation = false, timeout = this.timeout } = {}) {
+    if (!allowedCommand(message, mutation, this.current)) throw new Error('Unsupported command; nothing sent.');
+    if (mutation && this.current?.identity !== 'NAMLNK12') throw new Error('Read and verify NAMLNK12 before editing.');
     if (!this.connected) throw new Error('Plug disconnected.');
     if (this.pending) throw new Error('A read is already in progress.');
     if (this.writeStalled) throw new Error('A Bluetooth write did not finish. Disconnect and reconnect before retrying.');
@@ -129,7 +137,7 @@ export class PlugConnection extends EventTarget {
         if (this.pending !== pending) return;
         clearTimeout(pending.timer); this.pending = null; callback(value);
       };
-      const pending = { label, parse, writeDone: false, matched: false, value: null,
+      const pending = { label, parse, mutation, writeDone: false, matched: false, value: null,
         match: value => { pending.matched = true; pending.value = value; if (pending.writeDone) finish(resolve, value); },
         reject: error => finish(reject, error),
         timer: setTimeout(() => {
@@ -138,19 +146,21 @@ export class PlugConnection extends EventTarget {
           finish(reject, new Error(pending.writeDone
             ? `${label}: no matching reply. Bluetooth is still connected. Open Connection details.`
             : `${label}: Bluetooth write did not finish. Open Connection details, then disconnect and reconnect.`));
-        }, this.timeout)
+        }, timeout)
       };
       this.pending = pending;
       (async () => {
         const wait = this.spacing - (Date.now() - this.lastWrite); if (wait > 0) await pause(wait);
         // Zero timestamps match the known Mighty Plug Pro request frames.
-        for (const packet of encodeSysEx(message, 0)) {
+        const packets = message[0] === 176 ? [Uint8Array.from([128,128,...message])] : encodeSysEx(message, 0);
+        for (let index = 0; index < packets.length; index++) {
+          if (index) await pause(15);
           this.assertSession(epoch); if (this.pending !== pending) return;
-          await this.writePacket(packet, pending, epoch, characteristic);
+          await this.writePacket(packets[index], pending, epoch, characteristic);
         }
         this.assertSession(epoch); if (this.pending !== pending) return;
         pending.writeDone = true;
-        if (pending.matched) finish(resolve, pending.value);
+        if (!parse || pending.matched) finish(resolve, pending.value);
       })().catch(pending.reject);
     });
   }
@@ -168,7 +178,8 @@ export class PlugConnection extends EventTarget {
     const chain = await this.request(CHAIN_REQUEST, chainParser(), 'Reading signal chain');
     if (await this.readPage(25) !== words[25] || await this.readPage(5) !== words[5])
       throw new Error('The preset changed while reading. Refresh to read it again.');
-    const state = decodeSnapshot(words, chain, identity); this.progress('Ready'); return state;
+    const state = decodeSnapshot(words, chain, identity); validateEffects(state.effects);
+    this.current = state; this.progress('Ready'); return state;
   }
   async refresh() {
     if (this.busy) throw new Error('A read is already in progress.');

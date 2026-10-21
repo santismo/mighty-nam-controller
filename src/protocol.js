@@ -9,8 +9,7 @@ export const pageRequest = page => {
   if (!Number.isInteger(page) || page < 0 || page > 25) throw new Error('Invalid status page');
   return [...prefix, 78, 80, page, 247];
 };
-// This is the only outbound allowlist. No CC, recall/save, mute/listen, model,
-// firmware, reset or arbitrary MIDI command can pass through this controller.
+// Status-only allowlist. Typed editor commands are separately bounded in commands.js.
 export function isReadOnlyRequest(message) {
   return same(message, IDENTITY_REQUEST) || same(message, CHAIN_REQUEST) ||
     (message.length === 10 && starts(message, [...prefix, 78, 80]) &&
@@ -70,5 +69,5 @@ export function decodeSnapshot(words, chain, identity) {
     throw new Error('The plug returned an invalid status.');
   return { identity, buffer: buffer & 255, sampleRate: buffer >>> 16, active: bank & 255,
     occupied: (bank >>> 8) & 127, listening: Boolean(listen & 1), settling: Boolean(listen & 2),
-    running: Boolean(words[9]), loaded: words[5] !== 0, faults: words[4] + words[10], ...chain };
+    running: Boolean(words[9]), loaded: words[5] !== 0, modelCrc: words[5], faults: words[4] + words[10], ...chain };
 }
