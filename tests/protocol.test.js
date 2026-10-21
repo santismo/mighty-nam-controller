@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { IDENTITY_REQUEST, CHAIN_REQUEST, pageRequest, isReadOnlyRequest, parseIdentity, parsePage, parseChain, decodeSnapshot } from '../src/protocol.js';
-import { identityFrame, pageFrame, chainFrame, statusWords } from './fixtures.js';
+import { IDENTITY_REQUEST, CHAIN_REQUEST, pageRequest, isReadOnlyRequest, parseIdentity, parsePage, parseChain, chainParser, decodeSnapshot } from '../src/protocol.js';
+import { identityFrame, pageFrame, chainFrame, chainParts, statusWords } from './fixtures.js';
 
 test('outbound allowlist permits only exact read queries', () => {
   const allowed = [IDENTITY_REQUEST, CHAIN_REQUEST, ...Array.from({ length: 26 }, (_, p) => pageRequest(p))];
@@ -36,4 +36,17 @@ test('unrecognized firmware, incomplete words and invalid flags are rejected', (
     const words = statusWords(); words[page] = value; assert.throws(() => decodeSnapshot(words, chain, 'NAMLNK12'));
   }
   assert.throws(() => decodeSnapshot(statusWords(), chain, 'NAMLNK11'));
+});
+test('Bluetooth chain requires three complete ordered pieces from one preset channel', () => {
+  const parts = chainParts(); assert.deepEqual(parts.map(p => p.length), [59, 59, 37]);
+  const parse = chainParser(); assert.equal(parse(parts[0]), null); assert.equal(parse(parts[1]), null);
+  assert.deepEqual(parse(parts[2]), parseChain(chainFrame()));
+  for (const sequence of [[parts[1], parts[2]], [parts[0], parts[2]], [parts[0], parts[1], parts[1], parts[2]],
+    [parts[0], parts[1].map((b, i) => i === 6 ? 1 : b), parts[2]],
+    [parts[0].slice(0, -1), parts[1], parts[2]]]) {
+    const rejected = chainParser(); for (const frame of sequence) assert.equal(rejected(frame), null);
+  }
+  const restarted = chainParser(); restarted(parts[0]); restarted(parts[1]);
+  restarted(parts[0]); restarted(parts[1]); assert.deepEqual(restarted(parts[2]), parseChain(chainFrame()));
+  assert.deepEqual(chainParser()(chainFrame()), parseChain(chainFrame()));
 });

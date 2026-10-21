@@ -1,4 +1,4 @@
-import { PlugConnection } from './device.js';
+import { PlugConnection } from './device.js?v=0.2.0';
 
 const $ = id => document.getElementById(id);
 const connection = new PlugConnection(navigator.bluetooth);
@@ -16,14 +16,21 @@ const blocks = {
 };
 let snapshot = null, selected = 3, busy = false, operation = 0;
 
-function message(text, error = false) { $('message').textContent = text; $('message').classList.toggle('error', error); }
+function message(text, error = false) {
+  $('message').textContent = text; $('message').classList.toggle('error', error);
+  if (error && connection.log.length) $('connection-details').open = true;
+}
+function diagnostics() {
+  $('connection-details').hidden = !connection.log.length;
+  $('diagnostics-text').value = connection.report();
+}
 function render() {
   const online = Boolean(snapshot && connection.connected);
-  $('connection-state').textContent = busy ? 'Connecting…' : online ? 'Connected' : 'Offline';
-  $('connection-state').classList.toggle('online', online);
-  $('connect').textContent = online ? 'Disconnect' : busy ? 'Cancel' : 'Connect';
+  $('connection-state').textContent = busy ? connection.connected ? 'Reading…' : 'Connecting…' : online ? 'Connected' : connection.connected ? 'Linked' : 'Offline';
+  $('connection-state').classList.toggle('online', connection.connected);
+  $('connect').textContent = busy ? 'Cancel' : connection.connected ? 'Disconnect' : 'Connect';
   $('connect').disabled = !navigator.bluetooth?.requestDevice;
-  $('refresh').disabled = !online || busy;
+  $('refresh').disabled = !connection.connected || busy || connection.writeStalled;
   $('presets').replaceChildren(...colors.map((color, index) => {
     const item = document.createElement('li');
     const occupied = online && (snapshot.occupied & (1 << index));
@@ -37,7 +44,7 @@ function render() {
   }));
   $('active-preset').textContent = online ? colors[snapshot.active] ?? 'Unsaved' : '—';
   $('empty-chain').hidden = online; $('chain').hidden = !online;
-  $('chain-hint').textContent = online ? 'Select a block to inspect' : 'Waiting for connection';
+  $('chain-hint').textContent = online ? 'Select a block to inspect' : connection.connected ? 'Waiting for reply' : 'Waiting for connection';
   $('chain').replaceChildren();
   if (online) for (const id of snapshot.order) {
     const [name, short, path] = blocks[id]; const bypassed = Boolean(snapshot.effects[id] & 64);
@@ -55,7 +62,8 @@ function render() {
   $('output').textContent = online ? snapshot.settling ? 'Settling' : snapshot.listening ? 'On' : 'Muted' : '—';
   $('model').textContent = online ? snapshot.loaded ? 'Loaded' : 'Empty' : '—';
   $('health').textContent = online ? snapshot.faults ? 'Fault reported' : 'Ready' : '—';
-  $('version').textContent = online ? `${snapshot.identity} · View only` : 'Connection preview · 0.1';
+  $('version').textContent = online ? `0.2.0 · ${snapshot.identity}` : 'Connection preview · 0.2.0';
+  diagnostics();
 }
 function detail(online) {
   $('block-name').textContent = online ? blocks[selected][0] : 'No block selected';
@@ -86,7 +94,26 @@ $('refresh').addEventListener('click', async () => {
   catch (error) { if (ticket !== operation) return; snapshot = null; message(error.message, true); }
   finally { if (ticket === operation) { busy = false; render(); } }
 });
-connection.addEventListener('disconnected', () => { operation++; snapshot = null; busy = false; render(); message('Plug disconnected.'); });
+connection.addEventListener('diagnostic', diagnostics);
+connection.addEventListener('progress', () => {
+  if (busy) {
+    message(`${connection.stage}…`);
+    $('connection-state').textContent = connection.connected ? 'Reading…' : 'Connecting…';
+  }
+});
+connection.addEventListener('disconnected', event => {
+  operation++; snapshot = null; busy = false; render();
+  message(event.detail.stage === 'Ready' ? 'Plug disconnected.' : `Bluetooth disconnected during: ${event.detail.stage}.`, true);
+});
+$('copy-report').addEventListener('click', async () => {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(connection.report()); $('copy-status').textContent = 'Report copied.';
+  } catch {
+    const field = $('diagnostics-text'); field.focus(); field.select(); field.setSelectionRange(0, field.value.length);
+    $('copy-status').textContent = 'Select and copy the report below.';
+  }
+});
 window.addEventListener('pagehide', clear);
 $('browser-help').hidden = Boolean(navigator.bluetooth?.requestDevice);
 render();

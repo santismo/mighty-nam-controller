@@ -40,3 +40,11 @@ test('invalid outgoing frames are refused', () => {
   for (const frame of [[], [240], [240, 255, 247], [240, -1, 247], [240, 1.2, 247], [240, ...Array(329).fill(0), 247]]) assert.throws(() => encodeSysEx(frame));
   assert.throws(() => encodeSysEx([240, 247], 0, 4));
 });
+test('notifications accept ArrayBuffer, byte views and reject unsupported value types', () => {
+  const messages = []; const decoder = new SysExDecoder(m => messages.push([...m]));
+  const packet = Uint8Array.from([128, 128, 240, 1, 128, 247]);
+  decoder.push(packet.buffer); decoder.push(packet); decoder.push(new DataView(packet.buffer));
+  assert.deepEqual(messages, Array(3).fill([240, 1, 247]));
+  for (const invalid of [null, undefined, '8080f0', {}, [128, -1], [128, 1.1]]) decoder.push(invalid);
+  assert.equal(messages.length, 3);
+});

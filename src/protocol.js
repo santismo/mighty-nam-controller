@@ -38,6 +38,24 @@ export function parseChain(message) {
   if (order.length !== 9 || [...order].sort().join() !== '1,2,3,4,5,6,7,8,9') return null;
   return { effects, order };
 }
+// The stock channel-1 (Bluetooth) handler returns 50 + 50 + 28 bytes in
+// three independent SysEx replies tagged 0x30, 0x31 and 0x32. Channel 0
+// (USB) returns all 128 bytes in one reply. This accumulator is per request.
+export function chainParser() {
+  const pieces = []; let channel = null;
+  return message => {
+    const complete = parseChain(message);
+    if (complete) return complete;
+    if (message.length < 9 || !starts(message, [240, 67, 88, 112, 12, 2]) ||
+        message[6] > 6 || message.at(-1) !== 247 || message.slice(6, -1).some(b => b >= 128)) return null;
+    const part = message[7] - 0x30;
+    if (part < 0 || part > 2 || message.length !== (part === 2 ? 37 : 59)) return null;
+    if (part === 0) { pieces.length = 0; channel = message[6]; }
+    if (channel !== message[6] || pieces.length !== part * 50) { pieces.length = 0; channel = null; return null; }
+    pieces.push(...message.slice(8, -1));
+    return part === 2 ? parseChain([240, 67, 88, 112, 12, 2, channel, ...pieces, 247]) : null;
+  };
+}
 export function decodeSnapshot(words, chain, identity) {
   if ([0, 1, 2, 4, 5, 9, 10, 23, 24, 25].some(page =>
     !Number.isInteger(words[page]) || words[page] < 0 || words[page] > 0xffffffff))

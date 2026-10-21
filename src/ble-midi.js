@@ -14,11 +14,18 @@ export function encodeSysEx(message, timestamp = 0, mtu = 20) {
   return packets;
 }
 
+export function notificationBytes(data) {
+  if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (Array.isArray(data) && data.every(b => Number.isInteger(b) && b >= 0 && b <= 255)) return Uint8Array.from(data);
+  return null;
+}
+
 export class SysExDecoder {
   constructor(onMessage) { this.onMessage = onMessage; this.reset(); }
   reset() { this.message = null; this.updated = 0; }
   push(data, now = Date.now()) {
-    const bytes = data instanceof DataView ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : data;
+    const bytes = notificationBytes(data);
     if (now - this.updated > 2500) this.reset();
     this.updated = now;
     if (!bytes || bytes.length < 2 || bytes.length > 512 || (bytes[0] & 0xc0) !== 0x80) { this.reset(); return; }

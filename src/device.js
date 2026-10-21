@@ -1,41 +1,81 @@
-import { encodeSysEx, SysExDecoder } from './ble-midi.js';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.2.0';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  isReadOnlyRequest, pageRequest, parseIdentity, parsePage, parseChain, decodeSnapshot } from './protocol.js';
+  isReadOnlyRequest, pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.2.0';
+
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
+const hex = bytes => [...bytes].slice(0, 64).map(b => b.toString(16).padStart(2, '0')).join(' ');
 
 export class PlugConnection extends EventTarget {
-  constructor(bluetooth, timeout = 3500) {
-    super(); this.bluetooth = bluetooth; this.timeout = timeout; this.epoch = 0;
-    this.pending = null; this.busy = false; this.device = null; this.characteristic = null;
+  constructor(bluetooth, timeout = 6500, settle = 300, spacing = 35) {
+    super(); this.bluetooth = bluetooth; this.timeout = timeout; this.settle = settle; this.spacing = spacing;
+    this.epoch = 0; this.pending = null; this.busy = false; this.device = null; this.characteristic = null;
+    this.ready = false; this.writeStalled = false; this.writeMethod = null; this.lastWrite = 0;
+    this.log = []; this.stage = 'Idle'; this.notifications = 0; this.frames = 0; this.started = Date.now();
     this.decoder = new SysExDecoder(message => this.receive(message));
-    this.onValue = event => this.decoder.push(event.target.value);
-    this.onLost = () => { this.close(); this.dispatchEvent(new Event('disconnected')); };
+    this.onValue = event => {
+      const bytes = notificationBytes(event.target.value); this.notifications++;
+      this.record(bytes ? `RX ${bytes.length} bytes: ${hex(bytes)}` : 'RX unsupported value type');
+      this.decoder.push(bytes);
+    };
+    this.onLost = () => {
+      const stage = this.stage; this.record(`Bluetooth disconnected during ${stage}`); this.close(false);
+      this.dispatchEvent(new CustomEvent('disconnected', { detail: { stage } }));
+    };
   }
-  get connected() { return Boolean(this.device?.gatt.connected && this.characteristic); }
+  get connected() { return Boolean(this.ready && this.device?.gatt.connected && this.characteristic); }
+  record(text) {
+    this.log.push(`${((Date.now() - this.started) / 1000).toFixed(2)}s ${text}`);
+    if (this.log.length > 90) this.log.shift();
+    this.dispatchEvent(new Event('diagnostic'));
+  }
+  progress(stage) { this.stage = stage; this.record(stage); this.dispatchEvent(new Event('progress')); }
+  report() {
+    return `NAM Plug controller 0.2.0\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+  }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {
     if (this.busy || this.connected) throw new Error('A connection is already active.');
     if (!this.bluetooth?.requestDevice) throw new Error('Open this page in Bluefy on iPhone.');
     this.busy = true; const epoch = ++this.epoch;
+    this.log = []; this.notifications = 0; this.frames = 0; this.started = Date.now(); this.writeStalled = false;
+    this.writeMethod = null; this.lastWrite = 0;
     try {
+      this.progress('Choose your Mighty Plug Pro');
       const device = await this.bluetooth.requestDevice({
         filters: [{ namePrefix: 'MIGHTY PLUG PRO' }, { namePrefix: 'Mighty Plug Pro' }],
         optionalServices: [MIDI_SERVICE]
       });
       this.assertSession(epoch); this.device = device;
       device.addEventListener('gattserverdisconnected', this.onLost);
+      this.progress('Opening Bluetooth connection');
       const server = await device.gatt.connect();
       if (epoch !== this.epoch) { device.gatt.disconnect(); this.assertSession(epoch); }
+      this.progress('Finding MIDI service');
       const service = await server.getPrimaryService(MIDI_SERVICE); this.assertSession(epoch);
+      this.progress('Finding MIDI characteristic');
       const characteristic = await service.getCharacteristic(MIDI_CHARACTERISTIC); this.assertSession(epoch);
       this.characteristic = characteristic;
+      const p = characteristic.properties || {};
+      this.record(`Properties: notify=${Boolean(p.notify)} read=${Boolean(p.read)} write=${Boolean(p.write)} writeWithoutResponse=${Boolean(p.writeWithoutResponse)}`);
       characteristic.addEventListener('characteristicvaluechanged', this.onValue);
-      await characteristic.startNotifications(); this.assertSession(epoch);
+      this.progress('Starting notifications');
+      await characteristic.startNotifications(); this.assertSession(epoch); this.ready = true;
+      // Let the native bridge finish enabling notifications before the first read.
+      await pause(this.settle); this.assertSession(epoch);
       return await this.snapshot();
-    } catch (error) { if (epoch === this.epoch) this.close(); throw error; }
-    finally { if (epoch === this.epoch) this.busy = false; }
+    } catch (error) {
+      if (epoch === this.epoch) {
+        this.record(`${this.stage} failed — ${errorText(error)}`);
+        // A failed read is not a lost BLE connection. Retain it for manual retry.
+        if (!this.connected) this.close(false);
+      }
+      throw error;
+    } finally { if (epoch === this.epoch) this.busy = false; }
   }
-  close() {
-    this.epoch++; this.busy = false;
+  close(log = true) {
+    if (log) this.record('Disconnected by page');
+    this.epoch++; this.busy = false; this.ready = false; this.writeStalled = false;
     if (this.pending) this.pending.reject(new Error('Connection closed.'));
     this.decoder.reset();
     this.characteristic?.removeEventListener('characteristicvaluechanged', this.onValue);
@@ -47,58 +87,94 @@ export class PlugConnection extends EventTarget {
     this.device = null;
   }
   receive(message) {
+    this.frames++; this.record(`MIDI ${message.length} bytes: ${hex(message)}`);
     if (!this.pending) return;
     const value = this.pending.parse(message);
-    if (value !== null) this.pending.resolve(value);
+    if (value !== null) this.pending.match(value);
   }
-  request(message, parse) {
-    if (!isReadOnlyRequest(message)) return Promise.reject(new Error('Only status reads are allowed.'));
-    if (!this.connected) return Promise.reject(new Error('Plug disconnected.'));
-    if (this.pending) return Promise.reject(new Error('A read is already in progress.'));
-    this.decoder.reset();
+  async writePacket(packet, pending, epoch, characteristic) {
+    const p = characteristic.properties || {};
+    // Match Mightier Amp's iOS preference. Fall back only on explicit rejection.
+    const methods = [
+      ...(this.writeMethod ? [this.writeMethod] : []),
+      ...(p.writeWithoutResponse ? ['writeValueWithoutResponse'] : []),
+      ...(p.write ? ['writeValueWithResponse'] : []), 'writeValue'
+    ].filter((name, i, all) => all.indexOf(name) === i && typeof characteristic[name] === 'function');
+    if (!methods.length) throw new Error('No supported Bluetooth write method.');
+    let failure;
+    for (const method of methods) {
+      this.assertSession(epoch); if (this.pending !== pending) return;
+      this.record(`TX ${pending.label} via ${method}: ${hex(packet)}`);
+      try {
+        await characteristic[method](packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength));
+        this.assertSession(epoch); if (this.pending !== pending) return;
+        this.writeMethod = method; this.lastWrite = Date.now(); this.record(`Write accepted: ${method}`); return;
+      } catch (error) {
+        this.assertSession(epoch); if (this.pending !== pending) return;
+        this.record(`Write rejected: ${method} — ${errorText(error)}`); failure = error;
+        if (!this.connected || ['SecurityError', 'NotAllowedError'].includes(error?.name)) break;
+      }
+    }
+    throw new Error(`${pending.label}: Bluetooth write rejected (${failure?.message || 'unsupported method'}). Open Connection details.`);
+  }
+  async request(message, parse, label = 'Status read') {
+    if (!isReadOnlyRequest(message)) throw new Error('Only status reads are allowed.');
+    if (!this.connected) throw new Error('Plug disconnected.');
+    if (this.pending) throw new Error('A read is already in progress.');
+    if (this.writeStalled) throw new Error('A Bluetooth write did not finish. Disconnect and reconnect before retrying.');
     const epoch = this.epoch, characteristic = this.characteristic;
+    this.decoder.reset(); this.progress(label);
     return new Promise((resolve, reject) => {
       const finish = (callback, value) => {
         if (this.pending !== pending) return;
         clearTimeout(pending.timer); this.pending = null; callback(value);
       };
-      const pending = { parse, resolve: value => finish(resolve, value), reject: error => finish(reject, error),
-        timer: setTimeout(() => finish(reject, new Error('No reply. Close other plug controllers, then reconnect.')), this.timeout) };
+      const pending = { label, parse, writeDone: false, matched: false, value: null,
+        match: value => { pending.matched = true; pending.value = value; if (pending.writeDone) finish(resolve, value); },
+        reject: error => finish(reject, error),
+        timer: setTimeout(() => {
+          this.writeStalled = !pending.writeDone;
+          this.record(`Timeout: ${label}; write completed=${pending.writeDone}; notifications=${this.notifications}; MIDI replies=${this.frames}`);
+          finish(reject, new Error(pending.writeDone
+            ? `${label}: no matching reply. Bluetooth is still connected. Open Connection details.`
+            : `${label}: Bluetooth write did not finish. Open Connection details, then disconnect and reconnect.`));
+        }, this.timeout)
+      };
       this.pending = pending;
       (async () => {
-        for (const packet of encodeSysEx(message, Date.now() & 8191)) {
-          this.assertSession(epoch);
-          if (this.pending !== pending) return;
-          if (characteristic.properties.write && characteristic.writeValueWithResponse)
-            await characteristic.writeValueWithResponse(packet);
-          else if (characteristic.properties.writeWithoutResponse && characteristic.writeValueWithoutResponse)
-            await characteristic.writeValueWithoutResponse(packet);
-          else if (characteristic.writeValue) await characteristic.writeValue(packet);
-          else throw new Error('This Bluetooth connection does not support status requests.');
+        const wait = this.spacing - (Date.now() - this.lastWrite); if (wait > 0) await pause(wait);
+        // Zero timestamps match the known Mighty Plug Pro request frames.
+        for (const packet of encodeSysEx(message, 0)) {
+          this.assertSession(epoch); if (this.pending !== pending) return;
+          await this.writePacket(packet, pending, epoch, characteristic);
         }
+        this.assertSession(epoch); if (this.pending !== pending) return;
+        pending.writeDone = true;
+        if (pending.matched) finish(resolve, pending.value);
       })().catch(pending.reject);
     });
   }
   async readPage(page) {
-    const response = await this.request(pageRequest(page), message => parsePage(message, page));
-    if (response.error) throw new Error('The plug could not read its status. Reconnect and try again.');
+    const response = await this.request(pageRequest(page), message => parsePage(message, page), `Reading status ${page}`);
+    if (response.error) throw new Error(`Status ${page}: the plug returned error ${response.error}.`);
     return response.value;
   }
   async snapshot() {
-    const identity = await this.request(IDENTITY_REQUEST, parseIdentity);
-    if (identity !== 'NAMLNK12') throw new Error('This preview needs NAMLNK12 on the plug.');
+    const identity = await this.request(IDENTITY_REQUEST, parseIdentity, 'Reading firmware identity');
+    this.record(`Identity: ${identity}`);
+    if (identity !== 'NAMLNK12') throw new Error(`The plug reports ${identity}. This preview needs NAMLNK12.`);
     const words = [];
     for (const page of [0, 1, 2, 4, 5, 9, 10, 23, 24, 25]) words[page] = await this.readPage(page);
-    const chain = await this.request(CHAIN_REQUEST, parseChain);
+    const chain = await this.request(CHAIN_REQUEST, chainParser(), 'Reading signal chain');
     if (await this.readPage(25) !== words[25] || await this.readPage(5) !== words[5])
       throw new Error('The preset changed while reading. Refresh to read it again.');
-    return decodeSnapshot(words, chain, identity);
+    const state = decodeSnapshot(words, chain, identity); this.progress('Ready'); return state;
   }
   async refresh() {
     if (this.busy) throw new Error('A read is already in progress.');
-    this.busy = true;
+    this.busy = true; const epoch = this.epoch;
     try { return await this.snapshot(); }
-    catch (error) { this.close(); throw error; }
-    finally { this.busy = false; }
+    catch (error) { if (epoch === this.epoch) this.record(`${this.stage} failed — ${errorText(error)}`); throw error; }
+    finally { if (epoch === this.epoch) this.busy = false; }
   }
 }
