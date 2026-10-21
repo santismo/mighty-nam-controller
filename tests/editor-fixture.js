@@ -23,7 +23,7 @@ const ranges=[[13,16,15],[17,22,20],[31,42,36],[43,46,49],[47,52,54],[53,60,61],
 export function editingBluetooth(options={}){
   const words=statusWords(),effects=chainFrame().slice(7,-1),bank=Array.from({length:7},(_,i)=>header(i,effects));
   const extra=defaultFx(),bankFx=Array.from({length:7},()=>defaultFx());let pageCache=null,pageGeneration=0;
-  let generation=0,saveCount=0,writeCount=0;const requests=[],writes=[],methods=[];
+  let staging=null,session=0,received=0,expectedCrc=0;let generation=0,saveCount=0,writeCount=0;const requests=[],writes=[],methods=[];
   const characteristic=new EventTarget();characteristic.properties={notify:true,write:true,writeWithoutResponse:true};characteristic.startNotifications=async()=>characteristic;
   const emit=frame=>queueMicrotask(()=>{for(const packet of encodeSysEx(frame,0,options.replyMtu??20)){characteristic.value=packet.buffer;characteristic.dispatchEvent(new Event('characteristicvaluechanged'));}});
   const pageReply=index=>{
@@ -35,6 +35,18 @@ export function editingBluetooth(options={}){
     const m=[...frame];requests.push(m);options.onRequest?.(m,{words,effects,bank});
     if(m.length===5){reply(identityFrame(options.identity));return;}
     if(m[7]===82){if(options.dropPage===m[11])return;if(m[9]+128*m[10]!==pageGeneration)return;pageReply(m[11]);return;}
+    if(m[7]===76){
+      const q=unpack(m.slice(9,-1)),op=q[5],sid=get32(q,8),offset=get32(q,12);let error=0;words[23]=0;
+      if(op===2){if(staging&&session!==sid)error=4;else{session=sid;staging=new Uint8Array(8192);received=0;expectedCrc=get32(q,28);}}
+      if(op===3){if(!staging||sid!==session||offset!==received)error=4;else{staging.set(q.slice(24),offset);received+=q.length-24;}}
+      if(op===4){if(!staging||received!==8192||crc(staging)!==expectedCrc)error=5;else{words[5]=expectedCrc;words[9]=1;words[2]=1;staging=null;}}
+      if(op===5){if(sid!==session)error=2;else{staging=null;received=0;}}
+      if(options.dropModelOp===op)return;
+      const raw=new Uint8Array(48);set32(raw,0,0x314c504d);raw[4]=1;raw[5]=op|128;raw[6]=24;set32(raw,8,sid);
+      [error,received,words[5]+(options.badModelCrc&&op===4?1:0),8192,256,3].forEach((v,i)=>set32(raw,24+4*i,v));set32(raw,16,crc(raw.slice(24)));set32(raw,20,crc(raw.slice(0,20)));
+      // Actual firmware's 65-byte NL reply does NOT use NR paging.
+      emit([...m.slice(0,9),...pack(raw),247]);return;
+    }
     if(m[7]===70){
       const op=m[9],slot=m[10];let error=0;
       if(op===1){const model=m.slice(14,19).reduce((a,b,i)=>a+b*2**(7*i),0);if(slot!==(words[25]&255)||model!==words[5])error=2;else extra.splice(0,32,...m.slice(19,-1));}
@@ -50,7 +62,7 @@ export function editingBluetooth(options={}){
       if(op===3){extra.splice(0,32,...bankFx[slot]);effects.splice(0,128,...bank[slot].slice(128));words[5]=get32(bank[slot],16);words[24]=((words[24]&0xffffff00)|get32(bank[slot],24))>>>0;words[25]=(words[25]&0xffffff00)|slot;}
       if(op===2){
         if(get32(q,16)!==words[5]||get32(q,20)!==crc(effects))error=2;
-        else{saveCount++;bankFx[slot]=[...extra];const h=header(slot,effects,get32(q,28));set32(h,12,get32(bank[slot],12)+1);set32(h,16,words[5]);set32(h,20,get32(q,24));h.set(q.slice(32,64),32);h.set(q.slice(64,128),64);bank[slot]=h;words[23]=0;}
+        else{saveCount++;bankFx[slot]=[...extra];const h=header(slot,effects,get32(q,28));set32(h,12,get32(bank[slot],12)+1);set32(h,16,words[5]);set32(h,20,get32(q,24));h.set(q.slice(32,64),32);h.set(q.slice(64,128),64);bank[slot]=h;words[23]=0;words[25]=(words[25]&0xffffff00)|slot;}
       }
       options.onPreset?.(op,slot,{words,effects,bank});
       if(op===2&&options.dropSaveReply)return;
@@ -71,6 +83,6 @@ export function editingBluetooth(options={}){
     else decoder.push(Uint8Array.from(packet));
   };
   characteristic.writeValueWithoutResponse=d=>write('without',d);characteristic.writeValueWithResponse=d=>write('with',d);
-  const device=new EventTarget();device.gatt={connected:false,async connect(){this.connected=true;return this;},async getPrimaryService(){return {getCharacteristic:async()=>characteristic};},disconnect(){this.connected=false;device.dispatchEvent(new Event('gattserverdisconnected'));}};
+  const device=new EventTarget();device.id='synthetic-device';device.gatt={connected:false,async connect(){this.connected=true;return this;},async getPrimaryService(){return {getCharacteristic:async()=>characteristic};},disconnect(){this.connected=false;device.dispatchEvent(new Event('gattserverdisconnected'));}};
   return {bluetooth:{requestDevice:async()=>device},device,characteristic,words,effects,bank,extra,bankFx,requests,writes,methods,get saveCount(){return saveCount;},get writeCount(){return writeCount;}};
 }

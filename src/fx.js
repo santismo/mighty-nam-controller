@@ -1,4 +1,4 @@
-import { same } from './controls.js?v=0.5.0';
+import { same } from './controls.js?v=0.6.0';
 const PREFIX=[240,67,88,112,4,2,78,70,1];
 export const FX_MODES=['Pitch','Auto Wah','Chorus','Flanger','Phaser','Tremolo','Vibrato'];
 export function defaultFx(){const c=Array(32).fill(0);for(let j=0;j<2;j++){const i=j*16;c[i]=j+1;c[i+2]=j+2;c[i+3]=12;c[i+4]=100;c[i+5]=30;c[i+6]=c[i+8]=c[i+9]=50;}return c;}

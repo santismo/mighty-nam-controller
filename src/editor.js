@@ -1,10 +1,13 @@
-import { fxRequest, fxReply } from './fx.js?v=0.5.0';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.5.0';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.5.0';
-import { detectPitch } from './tuner.js?v=0.5.0';
+import { fxRequest, fxReply } from './fx.js?v=0.6.0';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.0';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.6.0';
+import { detectPitch } from './tuner.js?v=0.6.0';
+import { modelPacket,modelReply } from './model-wire.js?v=0.6.0';
+import { validateModel,includesCab } from './model.js?v=0.6.0';
+import { put,crc32,nameBytes } from './commands.js?v=0.6.0';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
-  constructor(link){this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
+  constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
   resetBank(){this.bank=[];this.largeReplies=null;this.bankWarning='';}
   requireLargeReplies(){
     if(this.largeReplies===false)throw new Error('Preset selection, saving and tuner are unavailable over this Bluetooth connection. Use live controls or the Mac app.');
@@ -126,6 +129,62 @@ export class PlugEditor {
     for(const entry of [saved,checked])if(!entry.occupied||entry.active!==state.active||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==before.flags||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
     if(state.fx&&(!same(saved.fx,state.fx)||!same(checked.fx,state.fx)||!same(after.fx,state.fx)))throw new Error('Saved FX readback did not match.');
     if(saved.generation!==checked.generation||checked.generation<before.generation||after.listening||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==state.active||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
+    return after;
+  });}
+  loadModel(expected,model,{progress=()=>{},canceled=()=>false}={}){return this.run(async()=>{
+    await validateModel(model);
+    if(expected.identity!=='NAMLNK14')throw new Error('Bluetooth capture loading requires NAMLNK14.');
+    const before=await this.link.snapshot();
+    if(before.active!==expected.active||before.modelCrc!==expected.modelCrc||before.buffer!==expected.buffer||!same(before.effects,expected.effects)||(expected.fx&&!same(before.fx,expected.fx))||before.faults)throw new Error('The plug changed. Refresh before loading a capture.');
+    const epoch=this.link.epoch;let began=false,committed=false;const session=crypto.getRandomValues(new Uint32Array(1))[0]||1;
+    const exchange=async(op,offset=0,data=[],target=session)=>{
+      const wire=modelPacket(op,op===1?0:target,offset,data);
+      const reply=await this.link.request(wire,m=>modelReply(m,wire),op===3?`Loading capture ${Math.floor((offset+data.length)*100/8192)}%`:'Preparing NAM capture',{mutation:true,timeout:10000});
+      if((reply.error&&!(op===5&&reply.error===2))||reply.slotBytes!==8192||reply.maxChunk!==256||reply.capabilities!==3)throw new Error(`The plug rejected the capture transfer (${reply.error}).`);
+      return reply;
+    };
+    try{
+      await this.send(listenCommand(false),'Muting for capture transfer');
+      if((await this.link.readPage(23))&1)throw new Error('Mute was not confirmed.');
+      await exchange(1);
+      // An interrupted transfer belongs to this browser/device pair. Abort
+      // only that exact random session; never clear another controller's work.
+      const deviceId=this.link.device?.id;
+      let previous=this.unfinishedTransfer;try{previous=previous||JSON.parse(this.recoveryStorage?.getItem('namplug.transfer.v1')||'null');}catch{}
+      if(deviceId&&previous?.deviceId===deviceId&&Number.isInteger(previous.session)&&previous.session>0&&previous.session<=0xffffffff){await exchange(5,0,[],previous.session);this.clearTransfer();}
+      const body=Array(8).fill(0);put(body,0,8192);put(body,4,model.crc);began=true;this.unfinishedTransfer={deviceId,session};try{if(deviceId)this.recoveryStorage?.setItem('namplug.transfer.v1',JSON.stringify(this.unfinishedTransfer));}catch{}await exchange(2,0,body);
+      for(let offset=0;offset<8192;offset+=256){
+        if(canceled())throw new Error('Capture transfer canceled.');
+        if((await this.link.readPage(25)&255)!==expected.active)throw new Error('The preset changed during transfer.');
+        const reply=await exchange(3,offset,[...model.slot.slice(offset,offset+256)]);
+        if(reply.received!==offset+256)throw new Error('Capture transfer position did not match.');progress(reply.received,8192);
+      }
+      if(canceled())throw new Error('Capture transfer canceled.');
+      if((await this.link.readPage(25)&255)!==expected.active)throw new Error('The preset changed during transfer.');
+      const done=await exchange(4);committed=true;this.clearTransfer();if(done.crc!==model.crc)throw new Error('Capture checksum was not confirmed.');
+      let state=await this.link.snapshot();
+      if(state.active!==expected.active||state.modelCrc!==model.crc||state.listening||state.faults||!state.running||!same(state.effects,expected.effects)||!same(state.fx,expected.fx))throw new Error('The loaded capture was not confirmed. Refresh the plug.');
+      const effects=[...state.effects];effects[3]&=63;if(includesCab(model))effects[9]|=64;
+      state=await this.applyInternal(state,effects,state.buffer);this.activeCapture=model;
+      this.link.progress('Capture loaded · plug muted');return state;
+    }catch(error){
+      if(epoch===this.link.epoch&&this.link.connected&&!this.link.writeStalled){
+        if(began&&!committed)try{await exchange(5);this.clearTransfer();}catch{}
+        try{await this.send(listenCommand(false),'Keeping plug muted');}catch{}
+      }
+      this.activeCapture=null;throw error;
+    }
+  });}
+  clearTransfer(){this.unfinishedTransfer=null;try{this.recoveryStorage?.removeItem('namplug.transfer.v1');}catch{}}
+  saveCapture(expected,effects,buffer,name,slot,model,{playOnBoot=false}={}){return this.run(async()=>{
+    this.requireLargeReplies();await validateModel(model);
+    if(!Number.isInteger(slot)||slot<0||slot>6||model.crc!==expected.modelCrc)throw new Error('Load this capture onto the plug before saving.');
+    const known=this.bank[slot],before=await this.preset(1,slot);if(!known||known.occupied!==before.occupied||known.generation!==before.generation||known.modelCrc!==before.modelCrc)throw new Error('The destination preset changed. Refresh and choose the color again.');const state=await this.applyInternal(expected,effects,buffer);
+    const body=Array(112).fill(0);put(body,0,model.crc);put(body,4,crc32(effects));put(body,8,playOnBoot?1:0);put(body,12,buffer);
+    body.splice(16,32,...model.sha.match(/../g).map(x=>parseInt(x,16)));const nameData=nameBytes(name);body.splice(48,nameData.length,...nameData);
+    const saved=await this.preset(2,slot,body),checked=await this.preset(1,slot),after=await this.link.snapshot();
+    for(const entry of [saved,checked])if(!entry.occupied||entry.modelCrc!==model.crc||entry.sha.map(x=>x.toString(16).padStart(2,'0')).join('')!==model.sha||entry.flags!==(playOnBoot?1:0)||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects)||!same(entry.fx,state.fx))throw new Error('Saved capture readback did not match. Refresh before saving again.');
+    if(saved.generation!==checked.generation||checked.generation<before.generation||after.listening||after.faults||!after.running||after.modelCrc!==model.crc||after.active!==slot||!same(after.effects,effects)||!same(after.fx,state.fx))throw new Error('Saved capture was not fully confirmed. Refresh before saving again.');
     return after;
   });}
   listen(enabled){return this.run(async()=>{

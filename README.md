@@ -1,6 +1,6 @@
 # NAM Plug controller
 
-[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.5.0)
+[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.6.0)
 
 A Bluetooth controller for NAM Plug. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**.
 
@@ -10,23 +10,35 @@ A Bluetooth controller for NAM Plug. On iPhone, open the page in [Bluefy](https:
 - Pitch moves in semitone steps from **−12 to +12**. The first implementation is intended for single notes. Its additional processing delay is separate from the output buffer; chord quality and hardware headroom are still experimental.
 - On **NAMLNK14**, choose **Equalizer → High / Low Cut**. Low Cut covers 20 Hz–1 kHz; High Cut covers 1–20 kHz. Both are 12 dB/oct filters, each with an **Off** position. The EQ block can move and save with the preset. This new choice is hidden on older firmware.
 - Controls apply live. Rapid slider movements are combined, and final settings are read back. They are **not saved automatically**.
-- **Save to plug** keeps the active preset's name, effects, order, buffer, existing NAM capture, and both new FX blocks after power-off. Switching presets discards unsaved edits. The page cannot yet replace a capture or fill an empty slot.
+- **Save to plug** keeps the preset name, effects, order, buffer, NAM capture, and both FX blocks after power-off. A phone-loaded capture can be saved to any of the seven colors, including an empty slot. The dialog identifies an occupied destination before replacing it. **Enable output when powering on** lets the saved preset play without a controller after restart; saving itself always leaves output muted. Switching presets discards unsaved edits.
 - Choose an **8, 16, or 32 sample** output buffer. Changing it mutes output; tap **Listen on plug** to resume. Saving also leaves the plug muted.
 - **Tuner → Check note** reads a short guitar snapshot from the plug. Pluck one string for each reading. It mutes the plug and stays muted when closed. It never accesses the phone or Mac microphone.
 
 Use one controller at a time. After changing presets with the plug's button, tap **Refresh**. A failed edit stops automatic writes until a fresh read. The page never retries a save automatically. Keep the page open and connected while saving.
 
-TONE3000 sign-in, capture downloads and Bluetooth model transfers are not included yet. Load captures with the Mac app for now. FX A/B require NAMLNK13; updating the page alone cannot add them to older firmware. The Mac compatibility update supports NAMLNK13 USB, but the two new FX editors are on this page.
+## TONE3000 captures
+
+1. Open **Captures** (or **NAM → Choose capture**) and choose **Browse TONE3000**. Sign in there, browse/filter/search, open a tone and tap **Select Tone** to return.
+2. Tap **Load capture** on a model. The controller extracts and validates the compatible **48 kHz A2 Lite** model, including Lite inside an A2 container. A1, other topologies and other sample rates cannot run on this firmware.
+3. Returning from the catalog disconnects Bluetooth. Tap **Connect** to send the selected download to the plug in normal mode. Keep the page open during transfer. No Mac, proxy, private API key, paid plan or firmware update is required on **NAMLNK14**.
+4. After checksum/readback confirmation the selected capture becomes the active NAM model. The plug stays muted. Amp + cabinet captures automatically bypass the stock cabinet. Tap **Listen on plug** when ready, with headphone volume low.
+5. **☆ Favorite** keeps multiple favorites on this phone. **Save to plug** is separate: choose a color to keep the capture and chain after power-off.
+
+The browser offers TONE3000 account favorites, downloaded/created tones and bounded trending/latest feeds. Full catalog search uses the official picker, in accordance with [TONE3000's API terms](https://www.tone3000.com/api/terms). Phone favorites are local and do not alter your TONE3000 favorites. Tap More to request another page; there is no catalog mirroring or bulk downloading.
+
+Up to 64 selected downloads are kept in this browser's local storage. Clearing browser data removes that phone library, but not onboard presets. The saved capture retains creator/license information; the repository includes no captures. Access/refresh tokens stay in memory, so reloading the page requires using Browse TONE3000 again. The short-lived PKCE verifier is stored only until return. Sign-in uses the project's public client ID; no private API key is embedded. An interrupted Bluetooth upload is aborted only for the exact prior session belonging to this browser/device pair, then restarted on an explicit new load. Preset saves are never retried automatically.
+
+Model transfers require NAMLNK14.  FX A/B require NAMLNK13; updating the page alone cannot add them to older firmware. The Mac compatibility update supports NAMLNK13 USB, but the two new FX editors are on this page.
 
 ## Firmware compatibility
 
-**NAMLNK14 experimental:** Adds High / Low Cut while keeping NAMLNK13 FX A/B and reply paging. The matching candidate has silent host, ARM-emulation and simulated-browser checks; installation and physical EQ listening/timing tests remain outstanding.
+**NAMLNK14 experimental:** High / Low Cut and FX A/B are installed on the development plug; muted USB controls/preset checks passed and the user confirmed the EQ works. Controller 0.6.0 adds model transfers using the existing firmware protocol. Real TONE3000 sign-in, selection, account downloads and A2 extraction passed in the desktop browser. BLE simulations and the exact NAMLNK14 ARM Bluetooth-channel parser pass transfer/readback checks; the first end-to-end Bluefy phone transfer remains to be confirmed on the physical plug.
 
 **NAMLNK12:** The existing nine-block controller and v0.3.1 fallback remain available. Some devices deliver only 75 of the expected 326 bytes of preset metadata over Bluetooth. In that case, the page verifies a fresh status snapshot and keeps live effects, buffer and output controls available. Preset selection, saving and tuner remain disabled for that session with a persistent notice. Use the physical preset button followed by **Refresh**, and the Mac app for saving or tuning. Manual Refresh retries metadata reads; saves are never retried automatically.
 
 **NAMLNK13 experimental:** Long preset and tuner replies are pulled in short, numbered Bluetooth pages. The controller rejects missing, reordered or mixed-generation pages. The new firmware and page have automated protocol, browser and firmware-emulation checks; initial USB checks and muted effects runs passed on the development plug, and the user confirmed Bluefy reaches Ready with both FX blocks visible. Phone save/tuner checks, listening quality and calibrated processing deadlines remain unverified. The installer clears the onboard bank; preserve presets before updating if you want to keep them.
 
-No firmware, captures, accounts or credentials are included in this repository. The page has no analytics and does not play audio. Connection reports stay in the browser until copied using **Connection details → Copy report**.
+No firmware images, captures, account sessions or private credentials are included in this repository. The TONE3000 publishable client ID is public by design. The page has no analytics and does not play audio. Connection reports stay in the browser until copied using **Connection details → Copy report**.
 
 Serve this directory over HTTPS (or localhost for development). No build step. Run `npm test` with Node.js 20 or later.
 
