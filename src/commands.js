@@ -1,7 +1,7 @@
-import { isFxRequest } from './fx.js?v=0.6.3';
-import { modelRequest } from './model-wire.js?v=0.6.3';
-import { isReadOnlyRequest } from './protocol.js?v=0.6.3';
-import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.6.3';
+import { isFxRequest } from './fx.js?v=0.6.4';
+import { modelRequest } from './model-wire.js?v=0.6.4';
+import { isReadOnlyRequest } from './protocol.js?v=0.6.4';
+import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.6.4';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -73,7 +73,7 @@ export const listenCommand=enabled=>[240,67,88,112,4,2,78,65,enabled?1:0,247];
 export const bufferCommand=samples=>[240,67,88,112,4,2,78,66,samples,247];
 export function allowedCommand(m,mutation=false,current=null) {
   if(isReadOnlyRequest(m))return true;
-  if(modelRequest(m))return mutation&&['NAMLNK14','NAMLNK15','NAMLNK16'].includes(current?.identity);
+  if(modelRequest(m))return mutation&&['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(current?.identity);
   if(isFxRequest(m,mutation,current))return true;
   try{if(prefix(m,NS)){const raw=rawPreset(m);return raw[5]===1||mutation;}}catch{return false;}
   if(!mutation)return false;
@@ -85,7 +85,7 @@ export function allowedCommand(m,mutation=false,current=null) {
   }
   if(m.length===17&&prefix(m,[240,67,88,112,13,1,9])&&m[16]===247)return validOrder(m.slice(7,16));
   if(m.length===10&&prefix(m,[240,67,88,112,4,2,78])&&m[9]===247)return (m[7]===65&&[0,1].includes(m[8]))||(m[7]===66&&[8,16,32].includes(m[8]));
-  if(m.length===14&&prefix(m,NU)&&m[9]>=3){try{return ['NAMLNK15','NAMLNK16'].includes(current?.identity)&&same(m,compactTunerRequest(m[9],m[11]+128*m[12]));}catch{return false;}}
+  if(m.length===14&&prefix(m,NU)&&m[9]>=3){try{return ['NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(current?.identity)&&same(m,compactTunerRequest(m[9],m[11]+128*m[12]));}catch{return false;}}
   if(m.length===14&&prefix(m,NU)){try{return same(m,tunerRequest(m[9],m[10],m[11]+128*m[12]));}catch{return false;}}
   return false;
 }

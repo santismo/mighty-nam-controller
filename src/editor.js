@@ -1,10 +1,10 @@
-import { fxRequest, fxReply } from './fx.js?v=0.6.3';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.3';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.6.3';
-import { detectPitch, pitchReading } from './tuner.js?v=0.6.3';
-import { modelPacket,modelReply } from './model-wire.js?v=0.6.3';
-import { validateModel,includesCab } from './model.js?v=0.6.3';
-import { put,crc32,nameBytes } from './commands.js?v=0.6.3';
+import { fxRequest, fxReply } from './fx.js?v=0.6.4';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.4';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.6.4';
+import { detectPitch, pitchReading } from './tuner.js?v=0.6.4';
+import { modelPacket,modelReply } from './model-wire.js?v=0.6.4';
+import { validateModel,includesCab } from './model.js?v=0.6.4';
+import { put,crc32,nameBytes } from './commands.js?v=0.6.4';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -37,7 +37,7 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
-    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
+    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }
   async fx(op,slot,config=null,model=0){
@@ -133,7 +133,7 @@ export class PlugEditor {
   });}
   loadModel(expected,model,{progress=()=>{},canceled=()=>false}={}){return this.run(async()=>{
     await validateModel(model);
-    if(!['NAMLNK14','NAMLNK15','NAMLNK16'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
+    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
     const before=await this.link.snapshot();
     if(before.active!==expected.active||before.modelCrc!==expected.modelCrc||before.buffer!==expected.buffer||!same(before.effects,expected.effects)||(expected.fx&&!same(before.fx,expected.fx))||before.faults)throw new Error('The plug changed. Refresh before loading a capture.');
     const epoch=this.link.epoch;let began=false,committed=false;const session=crypto.getRandomValues(new Uint32Array(1))[0]||1;
@@ -218,7 +218,7 @@ export class PlugEditor {
     }
   }
   tune(reference=440,{canceled=()=>false,onProgress=()=>{},fast=false}={}){return this.run(async()=>{
-    if(fast&&['NAMLNK15','NAMLNK16'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
+    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
     this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');

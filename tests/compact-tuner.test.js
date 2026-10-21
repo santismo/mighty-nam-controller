@@ -9,11 +9,11 @@ test('compact pitch is one small frame; nonce/CRC/version gates reject invalid f
  const q=compactTunerRequest(4,124),wire=reply(q);assert.equal(wire.length,42);assert.equal(compactTunerReply(wire,q).frequency,110);
  assert.equal(compactTunerReply(wire,compactTunerRequest(4,125)),null);
  const corrupt=[...wire];corrupt[30]^=1;assert.equal(compactTunerReply(corrupt,q),null);
- for(const id of ['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK17'])assert.equal(allowedCommand(q,true,{identity:id}),false);
+ for(const id of ['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK18'])assert.equal(allowedCommand(q,true,{identity:id}),false);
  assert.equal(allowedCommand(q,true,{identity:'NAMLNK15'}),true);assert.equal(allowedCommand(q,false,{identity:'NAMLNK15'}),false);
  assert.equal(allowedCommand([...q.slice(0,10),1,...q.slice(11)],true,{identity:'NAMLNK15'}),false);
 });
-for (const identity of ['NAMLNK15','NAMLNK16']) test(`${identity} tuner uses two requests per reading, no pages or repeated full status/mute cycle`,async()=>{
+for (const identity of ['NAMLNK15','NAMLNK16', 'NAMLNK17']) test(`${identity} tuner uses two requests per reading, no pages or repeated full status/mute cycle`,async()=>{
  const fake=editingBluetooth({identity}),link=new PlugConnection(fake.bluetooth,500,0,0),editor=new PlugEditor(link);await link.connect();const at=fake.requests.length;
  for(let i=0;i<3;i++) {const result=await editor.tune(440,{fast:true});assert.equal(result.reading.note,'A');assert.equal(result.reading.cents,0);assert.equal(result.compact,true);}
  assert.deepEqual(fake.requests.slice(at).map(m=>m[9]),[3,4,3,4,3,4]);assert.equal(fake.saveCount,0);assert.equal(fake.words[23],0);link.close();

@@ -22,6 +22,7 @@ export function tunerFrame(request,{generation=1,error=0,count=2048,frequency=11
 const ranges=[[13,16,15],[17,22,20],[31,42,36],[43,46,49],[47,52,54],[53,60,61],[61,64,70],[65,70,75]];
 export function editingBluetooth(options={}){
   const words=statusWords(),effects=chainFrame().slice(7,-1),bank=Array.from({length:7},(_,i)=>header(i,effects));
+  if(options.identity==='NAMLNK17')words[117]=options.codecStatus??0xc10f220a;
   const extra=defaultFx(),bankFx=Array.from({length:7},()=>defaultFx());let pageCache=null,pageGeneration=0;
   let staging=null,session=0,received=0,expectedCrc=0;let generation=0,saveCount=0,writeCount=0;const requests=[],writes=[],methods=[];
   const characteristic=new EventTarget();characteristic.properties={notify:true,write:true,writeWithoutResponse:true};characteristic.startNotifications=async()=>characteristic;
@@ -30,7 +31,7 @@ export function editingBluetooth(options={}){
     const total=pageCache.length,count=Math.ceil(total/40);
     emit([240,67,88,112,4,2,78,82,1,pageGeneration&127,pageGeneration>>>7,index,count,total&127,total>>>7,...pageCache.slice(index*40,(index+1)*40),247]);
   };
-  const reply=frame=>{if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16'].includes(options.identity)&&frame.length>64){pageCache=frame.slice(1,-1);pageGeneration=pageGeneration%16383+1;pageReply(0);}else emit(frame);};
+  const reply=frame=>{if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(options.identity)&&frame.length>64){pageCache=frame.slice(1,-1);pageGeneration=pageGeneration%16383+1;pageReply(0);}else emit(frame);};
   const decoder=new SysExDecoder(frame=>{
     const m=[...frame];requests.push(m);options.onRequest?.(m,{words,effects,bank});
     if(m.length===5){reply(identityFrame(options.identity));return;}
