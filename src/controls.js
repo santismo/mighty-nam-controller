@@ -1,6 +1,6 @@
-import { catalog } from './catalog.js?v=0.6.5';
+import { catalog } from './catalog.js?v=0.6.6';
 export { catalog };
-export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18'].includes(identity);
+export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19'].includes(identity);
 const cutLabel=(v,high)=>{if(v===0)return 'Off';const hz=(high?1000:20)*Math.pow(high?20:50,(v-1)/99);return hz>=1000?`${(hz/1000).toFixed(2)} kHz`:`${Math.round(hz)} Hz`;};
 const cutEq={id:4,name:'High / Low Cut',parameters:[false,true].map((high,i)=>({name:high?'High Cut':'Low Cut',cc:31+i,index:36+i,default:0,labels:Array.from({length:101},(_,v)=>cutLabel(v,high))}))};
 export const effectChoices=(id,identity)=>id===4&&hasCutEq(identity)?[...catalog[id],cutEq]:catalog[id]??[];

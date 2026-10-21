@@ -20,7 +20,7 @@ test('cut EQ is visible and writable only on NAMLNK14; each filter has Off and b
  assert.equal(allowedCommand([176,4,68],true,{identity:'NAMLNK14',effects}),true);
  assert.throws(()=>validateEffects(updated,'NAMLNK13'));
 });
-for (const identity of ['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18']) test(`${identity} cut EQ live controls, reorder, save and recall retain capture and both FX slots`,async()=>{
+for (const identity of ['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19']) test(`${identity} cut EQ live controls, reorder, save and recall retain capture and both FX slots`,async()=>{
  const fake=editingBluetooth({identity}),link=new PlugConnection(fake.bluetooth,1500,0,0),editor=new PlugEditor(link);
  await link.connect();await editor.readBank();const original=link.current;
  const effects=changeType(original.effects,4,4,identity);effects[4]=4;effects[36]=42;effects[37]=76;
