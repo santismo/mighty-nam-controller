@@ -28,11 +28,11 @@ The browser offers TONE3000 account favorites, downloaded/created tones and boun
 
 Up to 64 selected downloads are kept in this browser's local storage. Clearing browser data removes that phone library, but not onboard presets. The saved capture retains creator/license information; the repository includes no captures. Access/refresh tokens stay in memory, so reloading the page requires using Browse TONE3000 again. The short-lived PKCE verifier is stored only until return. Sign-in uses the project's public client ID; no private API key is embedded. An interrupted Bluetooth upload is aborted only for the exact prior session belonging to this browser/device pair, then restarted on an explicit new load. Preset saves are never retried automatically.
 
-Model transfers support NAMLNK14 through NAMLNK17. FX A/B require NAMLNK13–16; updating the page alone cannot add them to older firmware. Mac app 0.3.8 also includes both extra FX editors.
+Model transfers support NAMLNK14 through NAMLNK17. FX A/B support NAMLNK13–17; updating the page alone cannot add them to older firmware. Mac app 0.3.9 also includes both extra FX editors.
 
 ## Firmware compatibility
 
-**NAMLNK17 / controller 0.6.4:** recognizes the converter-filter trial and reports its cached startup check in Connection details. Existing controls, captures, presets and compact tuning remain available; 16 remains supported. The trial has offline checks but has not been installed or physically verified. Firmware installation is separate and requires preserving the onboard presets first.
+**NAMLNK17 / controller 0.6.4:** recognizes the converter-filter trial and reports its cached startup check in Connection details. Existing controls, captures, presets and compact tuning remain available; 16 remains supported. The trial is installed on the development plug: startup readback, all seven saved presets, power cycling and quiet eight-sample checks passed. Actual audio latency is not yet measured, and higher CPU snapshots versus the immediate 16 baseline remain under investigation. Firmware installation is separate and requires preserving the onboard presets first.
 
 **NAMLNK16 / controller 0.6.3:** recognizes the NAM processing optimization and retains the existing controls, capture transfers and compact tuner. It is installed on the development plug; seven presets survived restart and button cycling. Quiet matched-chain USB measurements used 4.0–4.6% fewer median processing cycles than 15. The fixed audio path is unchanged, and guitar-to-headphone latency has not been measured. Firmware installation remains separate and clears the onboard bank; preserve presets first.
 
