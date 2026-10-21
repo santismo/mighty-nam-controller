@@ -1,6 +1,6 @@
-import { isFxRequest } from './fx.js?v=0.4.1';
-import { isReadOnlyRequest } from './protocol.js?v=0.4.1';
-import { MAX_TYPES, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.4.1';
+import { isFxRequest } from './fx.js?v=0.5.0';
+import { isReadOnlyRequest } from './protocol.js?v=0.5.0';
+import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.5.0';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -77,7 +77,7 @@ export function allowedCommand(m,mutation=false,current=null) {
   if(m.length===3&&m[0]===176&&m.every(Number.isInteger)&&m[2]>=0&&m[2]<=127) {
     const cc=m[1],value=m[2];
     if(cc===3)return Boolean(current)&& (value&63)===(current.effects[3]&63);
-    if(MAX_TYPES[cc])return (value&63)>0&&(value&63)<=MAX_TYPES[cc];
+    if(MAX_TYPES[cc])return (value&63)>0&&(value&63)<=maxType(cc,current?.identity);
     return parameterIndex(cc)!==null&&value<=100;
   }
   if(m.length===17&&prefix(m,[240,67,88,112,13,1,9])&&m[16]===247)return validOrder(m.slice(7,16));

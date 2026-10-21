@@ -1,9 +1,9 @@
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.4.1';
-import { PlugConnection } from './device.js?v=0.4.1';
-import { PlugEditor } from './editor.js?v=0.4.1';
-import { LiveEdits } from './live.js?v=0.4.1';
-import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.4.1';
-import { nameBytes } from './commands.js?v=0.4.1';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.5.0';
+import { PlugConnection } from './device.js?v=0.5.0';
+import { PlugEditor } from './editor.js?v=0.5.0';
+import { LiveEdits } from './live.js?v=0.5.0';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.5.0';
+import { nameBytes } from './commands.js?v=0.5.0';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection);
 const blocks={
@@ -55,7 +55,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.4.1 · ${snapshot.identity}`:'0.4.1';
+  $('version').textContent=ready?`0.5.0 · ${snapshot.identity}`:'0.5.0';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
@@ -92,14 +92,14 @@ function renderChain(){
   $('chain').scrollLeft=scroll;
 }
 function detail(){
-  const ready=online(),choice=ready&&selected<10?chosenEffect(effects,selected):null;
+  const ready=online(),choice=ready&&selected<10?chosenEffect(effects,selected,snapshot?.identity):null;
   $('block-name').textContent=ready?blocks[selected][0]:'No block selected';
   const enabled=ready&&(selected>9?Boolean(fx[(selected-11)*16+1]):!(effects[selected]&64));
   $('block-state').textContent=ready?(enabled?'Enabled':'Bypassed'):'—';
   $('block-state').setAttribute('aria-pressed',String(enabled));
   $('block-state').setAttribute('aria-label',ready?`${blocks[selected][0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
   $('block-state').title=ready?`Tap to ${enabled?'bypass':'enable'} ${blocks[selected][0]}`:'';
-  $('block-info').textContent=!ready?'Your chain will appear here.':selected===3?'Onboard capture. Load new captures with the Mac app for now.':'';
+  $('block-info').textContent=!ready?'Your chain will appear here.':selected===3?'Onboard capture. Load new captures with the Mac app for now.':selected===4&&choice?.id===4?'12 dB/oct · set either control to Off to use the other alone.':'';
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
   if(ready&&selected>9)for(const p of fxControls(fx,selected-11)){
@@ -154,9 +154,9 @@ $('move-left').addEventListener('click',()=>{const order=fullOrder(effects,fx);m
 $('move-right').addEventListener('click',()=>{const order=fullOrder(effects,fx);move(selected,order[order.indexOf(selected)+1]);});
 function choices(){
   const query=$('effect-search').value.trim().toLowerCase();
-  const choices=(selected>9?FX_MODES.map((name,i)=>({name,id:i+1})):catalog[selected]??[]).filter(choice=>choice.name.toLowerCase().includes(query));
+  const choices=(selected>9?FX_MODES.map((name,i)=>({name,id:i+1})):effectChoices(selected,snapshot?.identity)).filter(choice=>choice.name.toLowerCase().includes(query));
   $('effect-list').replaceChildren(...choices.map(choice=>{
-    const b=button(choice.name,()=>{if(selected>9){const i=(selected-11)*16;fx[i]=choice.id;fx[i+3]=12;fx[i+4]=[3,4,5].includes(choice.id)?50:100;}else effects=changeType(effects,selected,choice.id);$('effect-dialog').close();edit(()=>{});});
+    const b=button(choice.name,()=>{if(selected>9){const i=(selected-11)*16;fx[i]=choice.id;fx[i+3]=12;fx[i+4]=[3,4,5].includes(choice.id)?50:100;}else effects=changeType(effects,selected,choice.id,snapshot?.identity);$('effect-dialog').close();edit(()=>{});});
     b.className='effect-choice';b.setAttribute('aria-pressed',String((selected>9?fx[(selected-11)*16]:effects[selected]&63)===choice.id));return b;
   }));if(!choices.length)$('effect-list').append(el('p','No matching effects.','secondary'));
 }

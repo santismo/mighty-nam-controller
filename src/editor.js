@@ -1,7 +1,7 @@
-import { fxRequest, fxReply } from './fx.js?v=0.4.1';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.4.1';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.4.1';
-import { detectPitch } from './tuner.js?v=0.4.1';
+import { fxRequest, fxReply } from './fx.js?v=0.5.0';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.5.0';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.5.0';
+import { detectPitch } from './tuner.js?v=0.5.0';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link){this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -34,7 +34,7 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
-    if(this.link.current?.identity==='NAMLNK13')result.fx=(await this.fx(2,slot)).config;
+    if(['NAMLNK13','NAMLNK14'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }
   async fx(op,slot,config=null,model=0){
@@ -67,7 +67,7 @@ export class PlugEditor {
   }
   async send(message,label){await this.link.request(message,null,label,{mutation:true});}
   async applyInternal(expected,effects,buffer){
-    validateEffects(effects);if(![8,16,32].includes(buffer))throw new Error('Invalid buffer.');
+    validateEffects(effects,expected.identity);if(![8,16,32].includes(buffer))throw new Error('Invalid buffer.');
     const plan=editPlan(expected.effects,effects);await this.current(expected);
     for(const message of plan)await this.send(message,'Applying signal chain');
     if(buffer!==expected.buffer)await this.send(bufferCommand(buffer),'Changing buffer');
@@ -82,7 +82,7 @@ export class PlugEditor {
   live(expected,latest){return this.run(async()=>{
     let state=await this.current(expected),effects=[...state.effects],buffer=state.buffer,fx=state.fx?[...state.fx]:null,lastGuard=Date.now();
     for(;;){
-      const target=latest();validateEffects(target.effects);
+      const target=latest();validateEffects(target.effects,expected.identity);
       if(![8,16,32].includes(target.buffer))throw new Error('Invalid buffer.');
       const plan=editPlan(effects,target.effects);
       if(plan.length||buffer!==target.buffer||(fx&&!same(fx,target.fx))){
