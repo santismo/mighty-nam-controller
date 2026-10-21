@@ -1,10 +1,10 @@
-import { fxRequest, fxReply } from './fx.js?v=0.6.0';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.0';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.6.0';
-import { detectPitch } from './tuner.js?v=0.6.0';
-import { modelPacket,modelReply } from './model-wire.js?v=0.6.0';
-import { validateModel,includesCab } from './model.js?v=0.6.0';
-import { put,crc32,nameBytes } from './commands.js?v=0.6.0';
+import { fxRequest, fxReply } from './fx.js?v=0.6.1';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.1';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.6.1';
+import { detectPitch } from './tuner.js?v=0.6.1';
+import { modelPacket,modelReply } from './model-wire.js?v=0.6.1';
+import { validateModel,includesCab } from './model.js?v=0.6.1';
+import { put,crc32,nameBytes } from './commands.js?v=0.6.1';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -117,16 +117,16 @@ export class PlugEditor {
     if(state.fx&&!same(state.fx,recalled.fx))throw new Error('Recalled FX settings did not match.');
     return state;
   });}
-  save(expected,effects,buffer,name){return this.run(async()=>{
+  save(expected,effects,buffer,name,{playOnBoot=true}={}){return this.run(async()=>{
     this.requireLargeReplies();
     // Fetch the current slot before any writes. Only preserve a known onboard
     // capture; never guess its SHA or overwrite another color's model.
     const before=await this.preset(1,expected.active);
-    saveBody(before,{...expected,effects,buffer},name);
+    saveBody(before,{...expected,effects,buffer},name,{playOnBoot});
     const state=await this.applyInternal(expected,effects,buffer);
-    const saved=await this.preset(2,state.active,saveBody(before,state,name));
+    const saved=await this.preset(2,state.active,saveBody(before,state,name,{playOnBoot}));
     const checked=await this.preset(1,state.active),after=await this.link.snapshot();
-    for(const entry of [saved,checked])if(!entry.occupied||entry.active!==state.active||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==before.flags||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
+    for(const entry of [saved,checked])if(!entry.occupied||entry.active!==state.active||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==(playOnBoot?1:0)||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
     if(state.fx&&(!same(saved.fx,state.fx)||!same(checked.fx,state.fx)||!same(after.fx,state.fx)))throw new Error('Saved FX readback did not match.');
     if(saved.generation!==checked.generation||checked.generation<before.generation||after.listening||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==state.active||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
     return after;
@@ -176,7 +176,8 @@ export class PlugEditor {
     }
   });}
   clearTransfer(){this.unfinishedTransfer=null;try{this.recoveryStorage?.removeItem('namplug.transfer.v1');}catch{}}
-  saveCapture(expected,effects,buffer,name,slot,model,{playOnBoot=false}={}){return this.run(async()=>{
+  saveCapture(expected,effects,buffer,name,slot,model,{playOnBoot=true}={}){return this.run(async()=>{
+    if(typeof playOnBoot!=='boolean')throw new Error('Invalid startup output setting.');
     this.requireLargeReplies();await validateModel(model);
     if(!Number.isInteger(slot)||slot<0||slot>6||model.crc!==expected.modelCrc)throw new Error('Load this capture onto the plug before saving.');
     const known=this.bank[slot],before=await this.preset(1,slot);if(!known||known.occupied!==before.occupied||known.generation!==before.generation||known.modelCrc!==before.modelCrc)throw new Error('The destination preset changed. Refresh and choose the color again.');const state=await this.applyInternal(expected,effects,buffer);
@@ -192,26 +193,33 @@ export class PlugEditor {
     await this.send(listenCommand(enabled),enabled?'Enabling plug output':'Muting plug');
     const after=await this.link.snapshot();if(after.listening!==enabled)throw new Error('Plug output state was not confirmed.');return after;
   });}
-  tune(reference=440){return this.run(async()=>{
+  tune(reference=440,{canceled=()=>false,onProgress=()=>{},fast=false}={}){return this.run(async()=>{
     this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');
     if((await this.link.readPage(23))&1)throw new Error('Mute was not confirmed.');
     const epoch=this.link.epoch;
+    const check=()=>{if(canceled())throw Object.assign(new Error('Tuner stopped.'),{code:'tuner-canceled'});};
     const request=async(op,page=0)=>{
       const wire=tunerRequest(op,page,this.token()%16383+1);
       const data=await this.link.request(wire,m=>tunerReply(m,wire),op===2?`Reading tuner ${page+1}/16`:op===1?'Capturing guitar':'Stopping tuner',{mutation:true});
       if(data.error&&!(op===2&&data.error===1))throw new Error('The plug could not capture a tuner reading.');return data;
     };
     try{
-      const start=await request(1);await pause(190);const samples=[];
+      check();const start=await request(1);await pause(190);const samples=[];
       for(let page=0;page<16;page++){
+        check();onProgress(page+1);
         let reply;for(let attempt=0;attempt<8;attempt++){reply=await request(2,page);if(reply.generation!==start.generation)throw new Error('Tuner capture changed. Try again.');if(!reply.error)break;await pause(25);}
         if(reply.error||reply.count!==2048)throw new Error('Tuner capture did not finish.');samples.push(...reply.samples);
+        if(fast&&(samples.length===512||samples.length===1024)){
+          const reading=detectPitch(samples,reference);
+          if(reading&&reading.confidence>=0.98&&reading.frequency>=(samples.length===512?75:40))return {reading,sampleCount:samples.length};
+          if(samples.length===512&&samples.every(x=>Math.abs(x)<16))return {reading:null,sampleCount:512};
+        }
       }
-      return {reading:detectPitch(samples,reference)};
+      return {reading:detectPitch(samples,reference),sampleCount:samples.length};
     }finally{
-      if(epoch===this.link.epoch&&this.link.connected&&!this.link.writeStalled){await request(0);await this.link.snapshot();}
+      if(epoch===this.link.epoch&&this.link.connected&&!this.link.writeStalled){await request(0);if(!fast&&!canceled())await this.link.snapshot();}
     }
   });}
 }

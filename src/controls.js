@@ -1,4 +1,4 @@
-import { catalog } from './catalog.js?v=0.6.0';
+import { catalog } from './catalog.js?v=0.6.1';
 export { catalog };
 export const hasCutEq=identity=>identity==='NAMLNK14';
 const cutLabel=(v,high)=>{if(v===0)return 'Off';const hz=(high?1000:20)*Math.pow(high?20:50,(v-1)/99);return hz>=1000?`${(hz/1000).toFixed(2)} kHz`:`${Math.round(hz)} Hz`;};

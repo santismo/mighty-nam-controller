@@ -55,7 +55,7 @@ export function editingBluetooth(options={}){
     if(m.length===7){for(let p=0;p<3;p++)reply([240,67,88,112,12,2,words[25]&255,48+p,...effects.slice(p*50,(p+1)*50),247]);return;}
     if(m[7]===80){reply(pageFrame(m[8],words[m[8]]));return;}
     if(m[7]===65){words[23]=m[8];return;}
-    if(m[7]===66){words[24]=((words[24]&0xffffff00)|m[8])>>>0;words[23]=0;return;}
+    if(m[7]===66){if(!options.ignoreBuffer){words[24]=((words[24]&0xffffff00)|m[8])>>>0;words[23]=0;}return;}
     if(m[4]===13){effects.splice(90,9,...m.slice(7,16));return;}
     if(m[7]===83){
       const q=unpack(m.slice(9,-1)),op=q[5],slot=q[6];let error=0;

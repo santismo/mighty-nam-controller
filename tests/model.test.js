@@ -37,8 +37,8 @@ test('full BLE capture transfer checks every chunk, makes it active, bypasses ca
   const {fake,link,editor}=await setup(),model=await fixtureModel(3),bank=fake.bank.map(x=>[...x]),extra=[...fake.extra],progress=[];fake.words[23]=1;
   const state=await editor.loadModel(link.current,model,{progress:n=>progress.push(n)});
   assert.equal(state.modelCrc,model.crc);assert.equal(state.listening,false);assert.equal(state.effects[3]&64,0);assert.equal(state.effects[9]&64,64);assert.deepEqual(state.fx,extra);assert.equal(progress.length,32);assert.equal(progress.at(-1),8192);assert.deepEqual(fake.bank.map(x=>[...x]),bank);assert.equal(fake.saveCount,0);assert.equal(editor.activeCapture.sha,model.sha);
-  const next=await editor.saveCapture(state,state.effects,state.buffer,'New capture',3,model);assert.equal(next.active,3);assert.equal(fake.saveCount,1);assert.equal(editor.bank[3].name,'New capture');assert.equal(editor.bank[3].flags,0);
-  const boot=await editor.saveCapture(next,next.effects,next.buffer,'New capture',3,model,{playOnBoot:true});assert.equal(editor.bank[3].flags,1);assert.equal(boot.listening,false);
+  const next=await editor.saveCapture(state,state.effects,state.buffer,'New capture',3,model);assert.equal(next.active,3);assert.equal(fake.saveCount,1);assert.equal(editor.bank[3].name,'New capture');assert.equal(editor.bank[3].flags,1);
+  const boot=await editor.saveCapture(next,next.effects,next.buffer,'New capture',3,model,{playOnBoot:false});assert.equal(editor.bank[3].flags,0);assert.equal(boot.listening,false);
   for(const i of [0,1,2,4,5,6])assert.deepEqual([...fake.bank[i]],bank[i]);link.close();
 });
 test('cancel, preset changes, lost replies and bad commit checksums cannot report active or save',async()=>{

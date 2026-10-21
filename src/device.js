@@ -1,10 +1,10 @@
-import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.6.0';
-import { fxRequest, fxReply } from './fx.js?v=0.6.0';
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.6.0';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.6.1';
+import { fxRequest, fxReply } from './fx.js?v=0.6.1';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.6.1';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.6.0';
-import { allowedCommand } from './commands.js?v=0.6.0';
-import { validateEffects } from './controls.js?v=0.6.0';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.6.1';
+import { allowedCommand } from './commands.js?v=0.6.1';
+import { validateEffects } from './controls.js?v=0.6.1';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -36,7 +36,9 @@ export class PlugConnection extends EventTarget {
   }
   progress(stage) { this.stage = stage; this.record(stage); this.dispatchEvent(new Event('progress')); }
   report() {
-    return `NAM Plug controller 0.6.0\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    const s=this.current;
+    const summary=s?`Firmware: ${s.identity}\nConfirmed buffer: ${s.buffer} samples at ${s.sampleRate} Hz\nActive color index: ${s.active}; capture CRC: ${s.modelCrc}; faults: ${s.faults}\nOutput: ${s.listening?'on':'muted'}; settling: ${s.settling}\nLive stock effects: ${s.effects.join(',')}\nLive FX A/B: ${s.fx?.join(',')??'unavailable'}\n`:'';
+    return `NAM Plug controller 0.6.1\n${summary}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {

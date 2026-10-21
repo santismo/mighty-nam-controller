@@ -1,10 +1,11 @@
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.6.0';
-import { PlugConnection } from './device.js?v=0.6.0';
-import { PlugEditor } from './editor.js?v=0.6.0';
-import { LiveEdits } from './live.js?v=0.6.0';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.6.0';
-import { nameBytes } from './commands.js?v=0.6.0';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.6.0';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.6.1';
+import { PlugConnection } from './device.js?v=0.6.1';
+import { PlugEditor } from './editor.js?v=0.6.1';
+import { LiveEdits } from './live.js?v=0.6.1';
+import { AutoTuner } from './auto-tuner.js?v=0.6.1';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.6.1';
+import { nameBytes } from './commands.js?v=0.6.1';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.6.1';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const blocks={
@@ -21,7 +22,14 @@ const blocks={
   9:['Cabinet','Cab','M5 3h14v18H5zM15 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0M15 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0']
 };
 let snapshot=null,effects=null,fx=null,buffer=8,selected=3,busy=false,needsRefresh=false,operation=0,dragged=null;
-let queuedCapture=null,activeCapture=null,loadTicket=0,activeTicket=0;
+let queuedCapture=null,activeCapture=null,loadTicket=0,activeTicket=0,tuning=false,playOnBoot=true;
+const autoTuner=new AutoTuner({
+  read:options=>editor.tune(Number($('reference').value),{...options,fast:true}),
+  onReading:({reading})=>showPitch(reading),
+  onProgress:page=>{$('tuner-progress').textContent=`Reading guitar · ${page}/16`;},
+  onBusy:value=>{tuning=value;status();if(!value&&!autoTuner.running&&!document.hidden&&$('tuner-dialog').open&&!needsRefresh&&online())queueMicrotask(()=>autoTuner.start());},
+  onError:error=>{needsRefresh=true;$('tuner-progress').textContent=error.message;message(error.message,true);status();}
+});
 const tones=new ToneBrowser({onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
 const live=new LiveEdits(editor,{
   changed:()=>status(),
@@ -29,27 +37,33 @@ const live=new LiveEdits(editor,{
   failed:error=>{needsRefresh=true;message(error.message,true);render();}
 });
 const online=()=>Boolean(snapshot&&connection.connected);
-const canEdit=()=>online()&&!busy&&!needsRefresh&&!connection.writeStalled&&!$('tuner-dialog').open;
-const locked=()=>busy||live.pending;
+const canEdit=()=>online()&&!busy&&!tuning&&!needsRefresh&&!connection.writeStalled&&!$('tuner-dialog').open;
+const locked=()=>busy||live.pending||tuning;
 function el(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
 function button(text,fn,label){const node=el('button',text);node.type='button';if(label)node.setAttribute('aria-label',label);node.addEventListener('click',fn);return node;}
 function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);if(error&&connection.log.length)$('connection-details').open=true;}
 function diagnostics(){$('connection-details').hidden=!connection.log.length;$('diagnostics-text').value=connection.report();}
 function savedMatches(){
   const saved=editor.bank[snapshot?.active];
-  return Boolean(saved?.occupied&&saved.modelCrc===snapshot.modelCrc&&same(saved.effects,effects)&&saved.buffer===buffer&&saved.name===$('preset-name').value.trim()&&(!fx||same(saved.fx,fx)));
+  return Boolean(saved?.occupied&&saved.modelCrc===snapshot.modelCrc&&same(saved.effects,effects)&&saved.buffer===buffer&&saved.flags===(playOnBoot?1:0)&&saved.name===$('preset-name').value.trim()&&(!fx||same(saved.fx,fx)));
 }
 function status(){
   const ready=online(),waiting=locked();
   $('connection-state').textContent=busy?'Working…':live.pending?'Updating…':ready?'Connected':connection.connected?'Linked':'Offline';
   $('connection-state').classList.toggle('online',connection.connected);
   $('connect').textContent=connection.connected?'Disconnect':'Connect';$('connect').disabled=waiting||!navigator.bluetooth?.requestDevice;
-  $('refresh').disabled=!connection.connected||waiting||connection.writeStalled;
+  $('refresh').disabled=!connection.connected||waiting||connection.writeStalled||$('tuner-dialog').open;
   $('active-preset').textContent=ready?COLORS[snapshot.active]??'Unsaved':'—';
   $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
   $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
   $('buffer').disabled=!canEdit();$('buffer').value=String(buffer);
+  const saved=editor.bank[snapshot?.active];
+  $('buffer-state').textContent=!ready?'8 samples is the minimum output buffer.':live.pending?`Applying · last confirmed ${snapshot.buffer} samples`:`Confirmed on plug: ${snapshot.buffer} samples${saved?.occupied?` · Saved: ${saved.buffer}`:''}`;
+  $('boot-output').checked=playOnBoot;$('boot-output').disabled=!canEdit()||waiting||editor.largeReplies!==true;
+  $('boot-state').textContent=!ready?'Save with each preset.':saved?.occupied?`Saved startup: ${saved.flags?'Output on':'Muted'}${saved.flags===(playOnBoot?1:0)?'':' · Save to plug to change'}`:'Save this capture to keep it after power-off.';
+  const delayed=fx?[0,16].filter(i=>fx[i+1]&&fx[i+4]>0&&([3,4,7].includes(fx[i])||(fx[i]===1&&fx[i+3]!==12))).map(i=>`${i?'FX B':'FX A'} ${FX_MODES[fx[i]-1]}`):[];
+  $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:'8 samples keeps the minimum output path. Buffer is saved separately for each color.';
   $('listen').disabled=!ready||waiting||needsRefresh||$('tuner-dialog').open;
   $('listen').textContent=snapshot?.listening?'Mute plug':'Listen on plug';
   $('tuner').disabled=!canEdit()||waiting||editor.largeReplies!==true;
@@ -58,7 +72,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.6.0 · ${snapshot.identity}`:'0.6.0';
+  $('version').textContent=ready?`0.6.1 · ${snapshot.identity}`:'0.6.1';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -136,7 +150,7 @@ async function work(label,action){
   try{await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();}}
 }
-function clear(){operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('tuner-dialog').close();render();}
+function clear(){autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('tuner-dialog').close();render();}
 async function recall(slot){
   if(slot===snapshot?.active&&savedMatches())return;
   if(!savedMatches()&&!confirm('Switch preset and discard the unsaved changes?'))return;
@@ -153,13 +167,14 @@ $('save').addEventListener('click',()=>{
     $('save-color').replaceChildren(...COLORS.map((color,i)=>{const option=el('option',`${i+1}. ${color}${editor.bank[i]?.occupied?` · ${editor.bank[i].name}`:' · Empty'}`);option.value=i;return option;}));
     $('save-color').value=String(snapshot.active<7?snapshot.active:0);saveDestination();$('save-dialog').showModal();return;
   }
-  work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value));message(`Saved to ${COLORS[snapshot.active]}. Plug muted.`);});
+  work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value,{playOnBoot}));message(`Saved to ${COLORS[snapshot.active]}. Startup output ${playOnBoot?'on':'muted'}; plug muted now.`);});
 });
-function saveDestination(){const row=editor.bank[Number($('save-color').value)];$('save-boot-output').checked=row?.flags===1;$('save-destination').textContent=row?.occupied?`Replaces “${row.name}” in ${COLORS[row.slot]}.`:'This color is empty.';}
+function saveDestination(){const row=editor.bank[Number($('save-color').value)];$('save-boot-output').checked=playOnBoot;$('save-destination').textContent=row?.occupied?`Replaces “${row.name}” in ${COLORS[row.slot]}.`:'This color is empty.';}
+$('boot-output').addEventListener('change',()=>{playOnBoot=$('boot-output').checked;status();});
 $('save-color').addEventListener('change',saveDestination);$('close-save').addEventListener('click',()=>$('save-dialog').close());
 $('confirm-save').addEventListener('click',()=>{
   if(!canEdit()||locked()||!activeCapture)return;
-  const slot=Number($('save-color').value),model=activeCapture,name=$('preset-name').value,playOnBoot=$('save-boot-output').checked;
+  const slot=Number($('save-color').value),model=activeCapture,name=$('preset-name').value;playOnBoot=$('save-boot-output').checked;
   try{nameBytes(name);}catch(e){message(e.message,true);return;}
   $('save-dialog').close();work('Saving capture and chain…',async()=>{accept(await editor.saveCapture(snapshot,effects,buffer,name,slot,model,{playOnBoot}));message(`Saved capture and effects to ${COLORS[slot]}. Plug muted.`);});
 });
@@ -180,22 +195,18 @@ function choices(){
 $('choose-effect').addEventListener('click',()=>{$('effect-search').value='';$('effect-heading').textContent=blocks[selected][0];choices();$('effect-dialog').showModal();});
 $('effect-search').addEventListener('input',choices);$('close-effects').addEventListener('click',()=>$('effect-dialog').close());
 $('tuner').addEventListener('click',()=>{
-  work('Muting for tuner…',async()=>{accept(await editor.listen(false),true);$('check-note').disabled=false;$('tuner-note').textContent='—';$('tuner-reading').textContent='Pluck one string, then check the note.';$('tuner-meter').value=0;$('tuner-dialog').showModal();message('Tuner open. Plug muted.');});
+  work('Muting for tuner…',async()=>{accept(await editor.listen(false),true);showPitch(null);$('tuner-progress').textContent='Reading guitar…';$('tuner-dialog').showModal();message('Tuner open. Plug muted.');autoTuner.start();});
 });
-$('check-note').addEventListener('click',async()=>{
-  $('check-note').disabled=true;$('close-tuner').disabled=true;$('tuner-reading').textContent='Pluck one string…';
-  try{
-    const {reading}=await editor.tune(Number($('reference').value));accept(connection.current,true);
+function showPitch(reading){
     $('tuner-note').textContent=reading?`${reading.note}${reading.octave}`:'—';
-    $('tuner-reading').textContent=reading?`${reading.cents>=0?'+':''}${reading.cents.toFixed(1)} cents · ${reading.frequency.toFixed(1)} Hz`:'No clear note. Pluck one string and check again.';
+    $('tuner-reading').textContent=reading?`${reading.cents>=0?'+':''}${reading.cents.toFixed(1)} cents · ${reading.frequency.toFixed(1)} Hz`:'Pluck one string and let it ring.';
     $('tuner-meter').value=reading?Math.max(-50,Math.min(50,reading.cents)):0;
     $('tuner-note').classList.toggle('in-tune',Boolean(reading?.inTune));
-  }catch(error){needsRefresh=true;$('tuner-reading').textContent=error.message;message(error.message,true);}
-  finally{$('check-note').disabled=needsRefresh;$('close-tuner').disabled=false;status();}
-});
+    $('tuner-progress').textContent='Updates automatically over Bluetooth.';
+}
 $('close-tuner').addEventListener('click',()=>$('tuner-dialog').close());
-$('tuner-dialog').addEventListener('cancel',event=>{if(connection.busy)event.preventDefault();});
-$('tuner-dialog').addEventListener('close',()=>{status();message(needsRefresh?'Refresh before editing again.':'Plug muted. Tap Listen on plug to resume.',needsRefresh);});
+$('tuner-dialog').addEventListener('close',()=>{autoTuner.stop();status();message(needsRefresh?'Refresh before editing again.':'Plug muted. Tap Listen on plug to resume.',needsRefresh);});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){autoTuner.stop();}else if($('tuner-dialog').open&&!needsRefresh&&!tuning&&online())autoTuner.start();});
 connection.addEventListener('diagnostic',diagnostics);
 connection.addEventListener('disconnected',event=>{clear();message(`Bluetooth disconnected during: ${event.detail.stage}.`,true);});
 $('copy-report').addEventListener('click',async()=>{

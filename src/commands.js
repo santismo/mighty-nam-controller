@@ -1,7 +1,7 @@
-import { isFxRequest } from './fx.js?v=0.6.0';
-import { modelRequest } from './model-wire.js?v=0.6.0';
-import { isReadOnlyRequest } from './protocol.js?v=0.6.0';
-import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.6.0';
+import { isFxRequest } from './fx.js?v=0.6.1';
+import { modelRequest } from './model-wire.js?v=0.6.1';
+import { isReadOnlyRequest } from './protocol.js?v=0.6.1';
+import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.6.1';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -36,10 +36,11 @@ export function presetRequest(op,slot,nonce,body=[]) {
   raw.splice(16,body.length,...body);put(raw,raw.length-4,crc32(raw.slice(0,-4)));
   const wire=[...NS,...pack7(raw),247];rawPreset(wire);return wire;
 }
-export function saveBody(saved,state,name) {
+export function saveBody(saved,state,name,{playOnBoot=true}={}) {
+  if(typeof playOnBoot!=='boolean')throw new Error('Invalid startup output setting.');
   validateEffects(state.effects);
   if(!saved?.occupied||saved.modelCrc!==state.modelCrc||saved.slot!==state.active||saved.sha?.length!==32)throw new Error('Recall an onboard capture before saving.');
-  const body=Array(112).fill(0);put(body,0,state.modelCrc);put(body,4,crc32(state.effects));put(body,8,saved.flags);put(body,12,state.buffer);
+  const body=Array(112).fill(0);put(body,0,state.modelCrc);put(body,4,crc32(state.effects));put(body,8,playOnBoot?1:0);put(body,12,state.buffer);
   body.splice(16,32,...saved.sha);const bytes=nameBytes(name);body.splice(48,bytes.length,...bytes);return body;
 }
 export function presetReply(wire,request) {
