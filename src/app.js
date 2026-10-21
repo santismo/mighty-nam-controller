@@ -1,9 +1,9 @@
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.4.0';
-import { PlugConnection } from './device.js?v=0.4.0';
-import { PlugEditor } from './editor.js?v=0.4.0';
-import { LiveEdits } from './live.js?v=0.4.0';
-import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.4.0';
-import { nameBytes } from './commands.js?v=0.4.0';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.4.1';
+import { PlugConnection } from './device.js?v=0.4.1';
+import { PlugEditor } from './editor.js?v=0.4.1';
+import { LiveEdits } from './live.js?v=0.4.1';
+import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.4.1';
+import { nameBytes } from './commands.js?v=0.4.1';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection);
 const blocks={
@@ -55,7 +55,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.4.0 · ${snapshot.identity}`:'0.4.0';
+  $('version').textContent=ready?`0.4.1 · ${snapshot.identity}`:'0.4.1';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
@@ -81,7 +81,7 @@ function renderChain(){
   for(const id of fullOrder(effects,fx)){
     const [name,short,path]=blocks[id],bypassed=id>9?!fx[(id-11)*16+1]:Boolean(effects[id]&64);
     const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.draggable=true;
-    const power=button('',()=>{selected=id;edit(next=>{if(id>9)fx[(id-11)*16+1]^=1;else next[id]^=64;});},`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
+    const power=button('',()=>toggleBlock(id),`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
     const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');const line=document.createElementNS(icon.namespaceURI,'path');line.setAttribute('d',path);icon.append(line);power.append(icon);
     const select=button('',()=>{selected=id;renderChain();detail();status();},`Edit ${name}`);select.className='block-select';select.setAttribute('aria-pressed',String(selected===id));select.append(el('span',short),el('small',bypassed?'Bypassed':'On'));
     block.addEventListener('dragstart',event=>{if(!canEdit()){event.preventDefault();return;}dragged=id;event.dataTransfer.setData('text/plain',String(id));});
@@ -94,7 +94,11 @@ function renderChain(){
 function detail(){
   const ready=online(),choice=ready&&selected<10?chosenEffect(effects,selected):null;
   $('block-name').textContent=ready?blocks[selected][0]:'No block selected';
-  $('block-state').textContent=ready?((selected>9?!fx[(selected-11)*16+1]:effects[selected]&64)?'Bypassed':'Enabled'):'—';
+  const enabled=ready&&(selected>9?Boolean(fx[(selected-11)*16+1]):!(effects[selected]&64));
+  $('block-state').textContent=ready?(enabled?'Enabled':'Bypassed'):'—';
+  $('block-state').setAttribute('aria-pressed',String(enabled));
+  $('block-state').setAttribute('aria-label',ready?`${blocks[selected][0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
+  $('block-state').title=ready?`Tap to ${enabled?'bypass':'enable'} ${blocks[selected][0]}`:'';
   $('block-info').textContent=!ready?'Your chain will appear here.':selected===3?'Onboard capture. Load new captures with the Mac app for now.':'';
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
@@ -112,6 +116,10 @@ function detail(){
     control.addEventListener(p.options?'change':'input',()=>edit(next=>{next[p.index]=Number(control.value);},false));
     label.append(heading,control);$('parameters').append(label);
   }
+}
+function toggleBlock(id){
+  if(!canEdit())return;selected=id;
+  edit(next=>{if(id>9)fx[(id-11)*16+1]^=1;else next[id]^=64;});
 }
 function edit(change,redraw=true){
   if(!canEdit())return;const next=[...effects];change(next);effects=next;
@@ -138,6 +146,7 @@ $('save').addEventListener('click',()=>{
   try{nameBytes($('preset-name').value);}catch(error){message(error.message,true);return;}
   work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value));message(`Saved to ${COLORS[snapshot.active]}. Plug muted.`);});
 });
+$('block-state').addEventListener('click',()=>toggleBlock(selected));
 $('preset-name').addEventListener('input',status);
 $('buffer').addEventListener('change',()=>{buffer=Number($('buffer').value);edit(()=>{},false);});
 $('listen').addEventListener('click',()=>work('Changing plug output…',async()=>{accept(await editor.listen(!snapshot.listening),true);message(snapshot.listening?'Listening on plug.':'Plug muted.');}));

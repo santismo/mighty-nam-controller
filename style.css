@@ -11,3 +11,5 @@ input,select{font:inherit;color:var(--text);border:1px solid var(--line);border-
 .presets .preset{background:#202225}.presets .preset.active{background:#2c2e31}
 
 #feature-notice{margin:0 0 24px}
+
+.block-toggle{min-height:44px;min-width:88px;padding:0 12px;background:#242629;font-size:12px;color:var(--text)}.block-toggle[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:#302d29}

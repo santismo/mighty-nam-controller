@@ -8,8 +8,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>NAM Plug</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=0.4.0">
-  <script type="module" src="./src/app.js?v=0.4.0"></script>
+  <link rel="stylesheet" href="./style.css?v=0.4.1">
+  <script type="module" src="./src/app.js?v=0.4.1"></script>
 </head>
 <body>
   <div class="shell">
@@ -31,7 +31,7 @@
         <div id="chain" class="chain" aria-label="Signal chain blocks" hidden></div>
         <section id="block-detail" class="block-detail" aria-labelledby="block-name">
           <div><span class="eyebrow">Selected block</span><h2 id="block-name">No block selected</h2></div>
-          <span id="block-state" class="tag">—</span>
+          <button type="button" id="block-state" class="tag block-toggle" aria-label="Selected block enabled" aria-pressed="false" disabled>—</button>
           <p id="block-info" class="secondary">Your chain will appear here.</p>
           <button id="choose-effect" class="effect-picker" hidden>Choose effect</button><div id="parameters" class="parameters"></div><div class="move-controls"><span class="secondary">Position</span><button id="move-left" aria-label="Move block left" disabled>←</button><button id="move-right" aria-label="Move block right" disabled>→</button></div>
         </section>
@@ -49,7 +49,7 @@
       <dialog id="effect-dialog"><div class="dialog-heading"><h2 id="effect-heading">Choose effect</h2><button id="close-effects" class="secondary-button">Close</button></div><input id="effect-search" type="search" placeholder="Find an effect" aria-label="Find an effect"><div id="effect-list" class="effect-list"></div></dialog>
       <dialog id="tuner-dialog"><div class="dialog-heading"><h2>Tuner <span class="secondary">· Plug muted</span></h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string, then check the note.</p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label><button id="check-note" class="primary">Check note</button></div></dialog>
     </main>
-    <footer><span id="version">0.4.0</span><a href="https://github.com/santismo/nam-plug-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
+    <footer><span id="version">0.4.1</span><a href="https://github.com/santismo/nam-plug-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
     <noscript>Enable JavaScript to connect.</noscript>
   </div>
 </body>

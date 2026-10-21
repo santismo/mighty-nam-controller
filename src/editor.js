@@ -1,7 +1,7 @@
-import { fxRequest, fxReply } from './fx.js?v=0.4.0';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.4.0';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.4.0';
-import { detectPitch } from './tuner.js?v=0.4.0';
+import { fxRequest, fxReply } from './fx.js?v=0.4.1';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.4.1';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.4.1';
+import { detectPitch } from './tuner.js?v=0.4.1';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link){this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
