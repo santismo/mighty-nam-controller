@@ -1,6 +1,6 @@
 # NAM Plug controller
 
-[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.6.3)
+[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.7.0)
 
 A Bluetooth controller for NAM Plug. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**.
 
@@ -29,6 +29,12 @@ The browser offers TONE3000 account favorites, downloaded/created tones and boun
 Up to 64 selected downloads are kept in this browser's local storage. Clearing browser data removes that phone library, but not onboard presets. The saved capture retains creator/license information; the repository includes no captures. Access/refresh tokens stay in memory, so reloading the page requires using Browse TONE3000 again. The short-lived PKCE verifier is stored only until return. Sign-in uses the project's public client ID; no private API key is embedded. An interrupted Bluetooth upload is aborted only for the exact prior session belonging to this browser/device pair, then restarted on an explicit new load. Preset saves are never retried automatically.
 
 Model transfers support NAMLNK14 through NAMLNK17. FX A/B support NAMLNK13–17; updating the page alone cannot add them to older firmware. Mac app 0.3.9 also includes both extra FX editors.
+
+## Active chains — controller 0.7.0
+
+With experimental NAMLNK20, the chain shows only effects that actually execute. Use **Add block** to insert an available effect; tap its symbol or the selected block's Remove control to remove it. Settings are retained when adding it again. Removing reverb or delay stops its tail. Controls apply live; **Save to plug** persists the chosen chain. Earlier firmware retains the full enable/bypass view.
+
+All existing NAMLNK19 controls and transfer paths remain supported, with NAMLNK20 added. Offline protocol and browser tests pass with simulated Bluetooth; physical NAMLNK20 validation is pending. Firmware installation is separate and clears the preset bank, so back up before updating. Fewer active processors do not by themselves establish lower measured audio latency.
 
 ## Firmware compatibility
 

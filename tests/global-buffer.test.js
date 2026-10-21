@@ -5,13 +5,13 @@ import {PlugEditor} from '../src/editor.js';
 import {editingBluetooth} from './editor-fixture.js';
 import {decodeSnapshot} from '../src/protocol.js';
 import {statusWords,chainFrame} from './fixtures.js';
-for(const identity of ['NAMLNK17','NAMLNK18','NAMLNK19'])for(const playing of [false,true])test(`${identity} buffer and save preserve playback=${playing}`,async()=>{
+for(const identity of ['NAMLNK17','NAMLNK18','NAMLNK19', 'NAMLNK20'])for(const playing of [false,true])test(`${identity} buffer and save preserve playback=${playing}`,async()=>{
  const fake=editingBluetooth({identity}),link=new PlugConnection(fake.bluetooth,300,0,0),editor=new PlugEditor(link);fake.words[23]=playing?1:0;
  await link.connect();await editor.readBank();let state=link.current;
  const original=fake.bank.map(h=>[...h]);
  for(const buffer of [32,16,8]){
   state=await editor.live(state,()=>({effects:state.effects,fx:state.fx,buffer}));
-  assert.equal(state.buffer,buffer);assert.equal(state.listening,playing);assert.equal(state.globalBuffer,['NAMLNK18','NAMLNK19'].includes(identity));assert.deepEqual(fake.bank.map(h=>[...h]),original);assert.equal(fake.saveCount,0);
+  assert.equal(state.buffer,buffer);assert.equal(state.listening,playing);assert.equal(state.globalBuffer,['NAMLNK18','NAMLNK19', 'NAMLNK20'].includes(identity));assert.deepEqual(fake.bank.map(h=>[...h]),original);assert.equal(fake.saveCount,0);
   if(state.globalBuffer){assert.ok(editor.bank.every(p=>p.buffer===buffer));for(let slot=0;slot<7;slot++){state=await editor.recall(slot);assert.equal(state.buffer,buffer);assert.equal(state.listening,playing);}}
  }
  state=await editor.save(state,state.effects,state.buffer,'Keep playback');assert.equal(state.listening,playing);assert.equal(fake.saveCount,1);link.close();
