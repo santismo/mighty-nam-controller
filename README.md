@@ -32,7 +32,7 @@ Model transfers require NAMLNK14, NAMLNK15 or NAMLNK16. FX A/B require NAMLNK13�
 
 ## Firmware compatibility
 
-**NAMLNK16 candidate / controller 0.6.3:** recognizes the NAM processing optimization trial and retains the existing controls, capture transfers and compact tuner. Its offline tests pass; physical performance and listening latency have not yet been measured. The firmware remains a separate installation.
+**NAMLNK16 / controller 0.6.3:** recognizes the NAM processing optimization and retains the existing controls, capture transfers and compact tuner. It is installed on the development plug; seven presets survived restart and button cycling. Quiet matched-chain USB measurements used 4.0–4.6% fewer median processing cycles than 15. The fixed audio path is unchanged, and guitar-to-headphone latency has not been measured. Firmware installation remains separate and clears the onboard bank; preserve presets first.
 
 **NAMLNK15 / controller 0.6.2:** adds compact automatic tuner readings calculated on the plug, avoiding multi-page audio transfers. The capture is 85 ms; Bluetooth and computation add time. NAMLNK14 keeps its previous tuner path. Firmware 15 also skips fully bypassed FX A/B after their fade and avoids reloading the same saved color when PRESET wraps to itself. Only occupied colors cycle: save another color if the page reports that only Green is saved. These firmware behaviors passed offline ARM checks. NAMLNK15 is installed on the development plug; saved presets survived restart and the user confirmed all seven colors cycle. Quiet compact USB tuner readings completed in 113–118 ms. Listening latency and Bluefy tuner cadence remain unmeasured.
 
