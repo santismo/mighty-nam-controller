@@ -1,5 +1,6 @@
-import { isReadOnlyRequest } from './protocol.js?v=0.3.1';
-import { MAX_TYPES, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.3.1';
+import { isFxRequest } from './fx.js?v=0.4.0';
+import { isReadOnlyRequest } from './protocol.js?v=0.4.0';
+import { MAX_TYPES, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.4.0';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -70,6 +71,7 @@ export const listenCommand=enabled=>[240,67,88,112,4,2,78,65,enabled?1:0,247];
 export const bufferCommand=samples=>[240,67,88,112,4,2,78,66,samples,247];
 export function allowedCommand(m,mutation=false,current=null) {
   if(isReadOnlyRequest(m))return true;
+  if(isFxRequest(m,mutation,current))return true;
   try{if(prefix(m,NS)){const raw=rawPreset(m);return raw[5]===1||mutation;}}catch{return false;}
   if(!mutation)return false;
   if(m.length===3&&m[0]===176&&m.every(Number.isInteger)&&m[2]>=0&&m[2]<=127) {

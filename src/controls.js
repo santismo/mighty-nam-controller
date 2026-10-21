@@ -1,4 +1,4 @@
-import { catalog } from './catalog.js?v=0.3.1';
+import { catalog } from './catalog.js?v=0.4.0';
 export { catalog };
 export const COLORS = ['Green', 'Orange', 'Red', 'Blue', 'Cyan', 'Pink', 'Lilac'];
 export const RANGES = [[13,16,15],[17,22,20],[31,42,36],[43,46,49],[47,52,54],[53,60,61],[61,64,70],[65,70,75]];

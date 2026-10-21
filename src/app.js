@@ -1,11 +1,14 @@
-import { PlugConnection } from './device.js?v=0.3.1';
-import { PlugEditor } from './editor.js?v=0.3.1';
-import { LiveEdits } from './live.js?v=0.3.1';
-import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.3.1';
-import { nameBytes } from './commands.js?v=0.3.1';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.4.0';
+import { PlugConnection } from './device.js?v=0.4.0';
+import { PlugEditor } from './editor.js?v=0.4.0';
+import { LiveEdits } from './live.js?v=0.4.0';
+import { COLORS, catalog, chosenEffect, changeType, same } from './controls.js?v=0.4.0';
+import { nameBytes } from './commands.js?v=0.4.0';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection);
 const blocks={
+  11:['FX A','FX A','M4 12h16M12 4v16M5 5l14 14'],
+  12:['FX B','FX B','M4 12h16M12 4v16M5 19L19 5'],
   1:['Compressor','Comp','M5 5v14M19 5v14M8 9h8M8 15h8M12 6v12'],
   2:['Drive','Drive','M3 15l6-8v10l6-10v10l6-8'],
   3:['NAM','NAM','M5 19V5h3l8 14h3V5M8 5v14M16 5v14'],
@@ -16,7 +19,7 @@ const blocks={
   8:['Reverb','Reverb','M3 9l3 6 3-6 3 6 3-6 3 6 3-6M3 4h18M3 20h18'],
   9:['Cabinet','Cab','M5 3h14v18H5zM15 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0M15 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0']
 };
-let snapshot=null,effects=null,buffer=8,selected=3,busy=false,needsRefresh=false,operation=0,dragged=null;
+let snapshot=null,effects=null,fx=null,buffer=8,selected=3,busy=false,needsRefresh=false,operation=0,dragged=null;
 const live=new LiveEdits(editor,{
   changed:()=>status(),
   accepted:state=>{snapshot=state;message('Live on plug. Save to keep after power-off.');status();},
@@ -31,7 +34,7 @@ function message(text,error=false){$('message').textContent=text;$('message').cl
 function diagnostics(){$('connection-details').hidden=!connection.log.length;$('diagnostics-text').value=connection.report();}
 function savedMatches(){
   const saved=editor.bank[snapshot?.active];
-  return Boolean(saved?.occupied&&saved.modelCrc===snapshot.modelCrc&&same(saved.effects,effects)&&saved.buffer===buffer&&saved.name===$('preset-name').value.trim());
+  return Boolean(saved?.occupied&&saved.modelCrc===snapshot.modelCrc&&same(saved.effects,effects)&&saved.buffer===buffer&&saved.name===$('preset-name').value.trim()&&(!fx||same(saved.fx,fx)));
 }
 function status(){
   const ready=online(),waiting=locked();
@@ -52,14 +55,14 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.3.1 · ${snapshot.identity}`:'0.3.1';
+  $('version').textContent=ready?`0.4.0 · ${snapshot.identity}`:'0.4.0';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
-  $('move-left').disabled=!canEdit()||effects?.[90]===selected;
-  $('move-right').disabled=!canEdit()||effects?.[98]===selected;
+  $('move-left').disabled=!canEdit()||(effects&&fullOrder(effects,fx)[0]===selected);
+  $('move-right').disabled=!canEdit()||(effects&&fullOrder(effects,fx).at(-1)===selected);
 }
-function accept(state,keepName=false){const name=keepName&&snapshot?.active===state.active&&snapshot?.modelCrc===state.modelCrc?$('preset-name').value:null;snapshot=state;effects=[...state.effects];buffer=state.buffer;needsRefresh=false;live.reset(state);$('preset-name').value=name??editor.bank[state.active]?.name??COLORS[state.active]??'Preset';render();}
+function accept(state,keepName=false){const name=keepName&&snapshot?.active===state.active&&snapshot?.modelCrc===state.modelCrc?$('preset-name').value:null;snapshot=state;effects=[...state.effects];fx=state.fx?[...state.fx]:null;if(selected>9&&!fx)selected=3;buffer=state.buffer;needsRefresh=false;live.reset(state);$('preset-name').value=name??editor.bank[state.active]?.name??COLORS[state.active]??'Preset';render();}
 function render(){
   const ready=online();
   $('presets').replaceChildren(...COLORS.map((color,index)=>{
@@ -75,10 +78,10 @@ function render(){
 }
 function renderChain(){
   const scroll=$('chain').scrollLeft;$('chain').replaceChildren();if(!online())return;
-  for(const id of effects.slice(90,99)){
-    const [name,short,path]=blocks[id],bypassed=Boolean(effects[id]&64);
+  for(const id of fullOrder(effects,fx)){
+    const [name,short,path]=blocks[id],bypassed=id>9?!fx[(id-11)*16+1]:Boolean(effects[id]&64);
     const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.draggable=true;
-    const power=button('',()=>{selected=id;edit(next=>{next[id]^=64;});},`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
+    const power=button('',()=>{selected=id;edit(next=>{if(id>9)fx[(id-11)*16+1]^=1;else next[id]^=64;});},`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
     const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');const line=document.createElementNS(icon.namespaceURI,'path');line.setAttribute('d',path);icon.append(line);power.append(icon);
     const select=button('',()=>{selected=id;renderChain();detail();status();},`Edit ${name}`);select.className='block-select';select.setAttribute('aria-pressed',String(selected===id));select.append(el('span',short),el('small',bypassed?'Bypassed':'On'));
     block.addEventListener('dragstart',event=>{if(!canEdit()){event.preventDefault();return;}dragged=id;event.dataTransfer.setData('text/plain',String(id));});
@@ -89,12 +92,18 @@ function renderChain(){
   $('chain').scrollLeft=scroll;
 }
 function detail(){
-  const ready=online(),choice=ready?chosenEffect(effects,selected):null;
+  const ready=online(),choice=ready&&selected<10?chosenEffect(effects,selected):null;
   $('block-name').textContent=ready?blocks[selected][0]:'No block selected';
-  $('block-state').textContent=ready?(effects[selected]&64?'Bypassed':'Enabled'):'—';
+  $('block-state').textContent=ready?((selected>9?!fx[(selected-11)*16+1]:effects[selected]&64)?'Bypassed':'Enabled'):'—';
   $('block-info').textContent=!ready?'Your chain will appear here.':selected===3?'Onboard capture. Load new captures with the Mac app for now.':'';
-  $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=choice?`${choice.name}  ›`:'Choose effect';
+  $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
+  if(ready&&selected>9)for(const p of fxControls(fx,selected-11)){
+    const label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output'),control=el('input');
+    const format=p.label??(v=>`${v} %`);value.textContent=format(fx[p.index]);heading.append(value);
+    control.type='range';control.min=p.min??0;control.max=p.max??100;control.step=1;control.value=fx[p.index];control.setAttribute('aria-label',p.name);control.dataset.fx=p.index;
+    control.addEventListener('input',()=>{fx[p.index]=Number(control.value);value.textContent=format(fx[p.index]);edit(()=>{},false);});label.append(heading,control);$('parameters').append(label);
+  }
   if(choice)for(const p of choice.parameters){
     const label=el('label',undefined,'parameter');const heading=el('span',p.name,'parameter-heading');let control;
     if(p.options){control=el('select');for(const option of p.options){const node=el('option',option.label);node.value=option.value;control.append(node);}control.value=effects[p.index];}
@@ -106,15 +115,15 @@ function detail(){
 }
 function edit(change,redraw=true){
   if(!canEdit())return;const next=[...effects];change(next);effects=next;
-  try{live.update(effects,buffer);message('Applying live…');if(redraw){renderChain();detail();}status();}catch(error){message(error.message,true);}
+  try{live.update(effects,buffer,fx);message('Applying live…');if(redraw){renderChain();detail();}status();}catch(error){message(error.message,true);}
 }
-function move(id,to){edit(next=>{const order=next.slice(90,99),from=order.indexOf(id),dest=order.indexOf(to);order.splice(from,1);order.splice(dest,0,id);next.splice(90,9,...order);});}
+function move(id,to){edit(next=>{const order=fullOrder(next,fx),from=order.indexOf(id),dest=order.indexOf(to);order.splice(from,1);order.splice(dest,0,id);const changed=reorder(next,fx,order);next.splice(0,128,...changed.effects);fx=changed.fx;});}
 async function work(label,action){
   if(locked())return;busy=true;const ticket=++operation;message(label);status();
   try{await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();}}
 }
-function clear(){operation++;busy=false;snapshot=null;effects=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('tuner-dialog').close();render();}
+function clear(){operation++;busy=false;snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('tuner-dialog').close();render();}
 async function recall(slot){
   if(slot===snapshot?.active&&savedMatches())return;
   if(!savedMatches()&&!confirm('Switch preset and discard the unsaved changes?'))return;
@@ -132,14 +141,14 @@ $('save').addEventListener('click',()=>{
 $('preset-name').addEventListener('input',status);
 $('buffer').addEventListener('change',()=>{buffer=Number($('buffer').value);edit(()=>{},false);});
 $('listen').addEventListener('click',()=>work('Changing plug output…',async()=>{accept(await editor.listen(!snapshot.listening),true);message(snapshot.listening?'Listening on plug.':'Plug muted.');}));
-$('move-left').addEventListener('click',()=>{const order=effects.slice(90,99);move(selected,order[order.indexOf(selected)-1]);});
-$('move-right').addEventListener('click',()=>{const order=effects.slice(90,99);move(selected,order[order.indexOf(selected)+1]);});
+$('move-left').addEventListener('click',()=>{const order=fullOrder(effects,fx);move(selected,order[order.indexOf(selected)-1]);});
+$('move-right').addEventListener('click',()=>{const order=fullOrder(effects,fx);move(selected,order[order.indexOf(selected)+1]);});
 function choices(){
   const query=$('effect-search').value.trim().toLowerCase();
-  const choices=(catalog[selected]??[]).filter(choice=>choice.name.toLowerCase().includes(query));
+  const choices=(selected>9?FX_MODES.map((name,i)=>({name,id:i+1})):catalog[selected]??[]).filter(choice=>choice.name.toLowerCase().includes(query));
   $('effect-list').replaceChildren(...choices.map(choice=>{
-    const b=button(choice.name,()=>{effects=changeType(effects,selected,choice.id);$('effect-dialog').close();edit(()=>{});});
-    b.className='effect-choice';b.setAttribute('aria-pressed',String((effects[selected]&63)===choice.id));return b;
+    const b=button(choice.name,()=>{if(selected>9){const i=(selected-11)*16;fx[i]=choice.id;fx[i+3]=12;fx[i+4]=[3,4,5].includes(choice.id)?50:100;}else effects=changeType(effects,selected,choice.id);$('effect-dialog').close();edit(()=>{});});
+    b.className='effect-choice';b.setAttribute('aria-pressed',String((selected>9?fx[(selected-11)*16]:effects[selected]&63)===choice.id));return b;
   }));if(!choices.length)$('effect-list').append(el('p','No matching effects.','secondary'));
 }
 $('choose-effect').addEventListener('click',()=>{$('effect-search').value='';$('effect-heading').textContent=blocks[selected][0];choices();$('effect-dialog').showModal();});

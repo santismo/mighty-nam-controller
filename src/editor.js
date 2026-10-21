@@ -1,6 +1,7 @@
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.3.1';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.3.1';
-import { detectPitch } from './tuner.js?v=0.3.1';
+import { fxRequest, fxReply } from './fx.js?v=0.4.0';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.4.0';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.4.0';
+import { detectPitch } from './tuner.js?v=0.4.0';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link){this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -33,7 +34,13 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
+    if(this.link.current?.identity==='NAMLNK13')result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
+  }
+  async fx(op,slot,config=null,model=0){
+    const wire=fxRequest(op,slot,this.token()%16383+1,config,model);
+    const result=await this.link.request(wire,m=>fxReply(m,wire),op===1?'Applying FX blocks':'Reading FX blocks',{mutation:op===1});
+    if(result.error)throw new Error('FX settings were rejected. Refresh the plug.');return result;
   }
   readBank(){return this.run(async()=>{
     this.resetBank();
@@ -54,7 +61,7 @@ export class PlugEditor {
   });}
   async current(expected){
     const now=await this.link.snapshot();
-    if(now.active!==expected.active||now.modelCrc!==expected.modelCrc||now.buffer!==expected.buffer||!same(now.effects,expected.effects))throw new Error('The plug changed since this page was read. Refresh before applying edits.');
+    if(now.active!==expected.active||now.modelCrc!==expected.modelCrc||now.buffer!==expected.buffer||!same(now.effects,expected.effects)||(expected.fx&&!same(now.fx,expected.fx)))throw new Error('The plug changed since this page was read. Refresh before applying edits.');
     if(now.faults||!now.running)throw new Error('The plug is not processing normally. Restart it before editing.');
     return now;
   }
@@ -73,12 +80,12 @@ export class PlugEditor {
   // Read the latest target before every write. A slider never builds a backlog
   // of old positions, and only explicit save() calls write the onboard bank.
   live(expected,latest){return this.run(async()=>{
-    let state=await this.current(expected),effects=[...state.effects],buffer=state.buffer,lastGuard=Date.now();
+    let state=await this.current(expected),effects=[...state.effects],buffer=state.buffer,fx=state.fx?[...state.fx]:null,lastGuard=Date.now();
     for(;;){
       const target=latest();validateEffects(target.effects);
       if(![8,16,32].includes(target.buffer))throw new Error('Invalid buffer.');
       const plan=editPlan(effects,target.effects);
-      if(plan.length||buffer!==target.buffer){
+      if(plan.length||buffer!==target.buffer||(fx&&!same(fx,target.fx))){
         if(Date.now()-lastGuard>250){
           const bank=await this.link.readPage(25),model=await this.link.readPage(5);
           if((bank&255)!==expected.active||model!==expected.modelCrc)throw new Error('Preset changed. Refresh before editing again.');
@@ -90,13 +97,13 @@ export class PlugEditor {
           await this.send(command,'Applying live control');
           if(command[0]===176)effects[command[1]<=9?command[1]:parameterIndex(command[1])]=command[2];
           else effects.splice(90,9,...command.slice(7,16));
-        }else{await this.send(bufferCommand(target.buffer),'Changing buffer');buffer=target.buffer;}
+        }else if(fx&&!same(fx,target.fx)){const reply=await this.fx(1,state.active,target.fx,state.modelCrc);if(reply.active!==state.active||!same(reply.config,target.fx))throw new Error('FX readback did not match.');fx=[...reply.config];}else{await this.send(bufferCommand(target.buffer),'Changing buffer');buffer=target.buffer;}
         continue;
       }
       await pause(100);state=await this.link.snapshot();lastGuard=Date.now();
-      if(state.active!==expected.active||state.modelCrc!==expected.modelCrc||state.buffer!==buffer||!same(state.effects,effects)||state.faults||!state.running)
+      if(state.active!==expected.active||state.modelCrc!==expected.modelCrc||state.buffer!==buffer||!same(state.effects,effects)||(fx&&!same(state.fx,fx))||state.faults||!state.running)
         throw new Error('Live changes were not confirmed. Refresh before editing again.');
-      const next=latest();if(same(next.effects,effects)&&next.buffer===buffer)return state;
+      const next=latest();if(same(next.effects,effects)&&next.buffer===buffer&&(!fx||same(next.fx,fx)))return state;
     }
   });}
   recall(slot){return this.run(async()=>{
@@ -104,6 +111,7 @@ export class PlugEditor {
     const meta=await this.preset(1,slot);if(!meta.occupied)throw new Error('This preset is empty.');
     const recalled=await this.preset(3,slot),state=await this.link.snapshot();
     if(recalled.active!==slot||state.active!==slot||state.modelCrc!==recalled.modelCrc||state.buffer!==recalled.buffer||!same(state.effects,recalled.effects)||state.faults||!state.running)throw new Error('Preset recall was not confirmed. Refresh the plug.');
+    if(state.fx&&!same(state.fx,recalled.fx))throw new Error('Recalled FX settings did not match.');
     return state;
   });}
   save(expected,effects,buffer,name){return this.run(async()=>{
@@ -116,6 +124,7 @@ export class PlugEditor {
     const saved=await this.preset(2,state.active,saveBody(before,state,name));
     const checked=await this.preset(1,state.active),after=await this.link.snapshot();
     for(const entry of [saved,checked])if(!entry.occupied||entry.active!==state.active||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==before.flags||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
+    if(state.fx&&(!same(saved.fx,state.fx)||!same(checked.fx,state.fx)||!same(after.fx,state.fx)))throw new Error('Saved FX readback did not match.');
     if(saved.generation!==checked.generation||checked.generation<before.generation||after.listening||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==state.active||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
     return after;
   });}

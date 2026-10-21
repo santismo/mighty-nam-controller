@@ -1,8 +1,10 @@
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.3.1';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.4.0';
+import { fxRequest, fxReply } from './fx.js?v=0.4.0';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.4.0';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.3.1';
-import { allowedCommand } from './commands.js?v=0.3.1';
-import { validateEffects } from './controls.js?v=0.3.1';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot } from './protocol.js?v=0.4.0';
+import { allowedCommand } from './commands.js?v=0.4.0';
+import { validateEffects } from './controls.js?v=0.4.0';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -34,7 +36,7 @@ export class PlugConnection extends EventTarget {
   }
   progress(stage) { this.stage = stage; this.record(stage); this.dispatchEvent(new Event('progress')); }
   report() {
-    return `NAM Plug controller 0.3.1\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `NAM Plug controller 0.4.0\nBluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {
@@ -94,6 +96,10 @@ export class PlugConnection extends EventTarget {
     this.frames++; this.record(`MIDI ${message.length} bytes: ${hex(message)}`);
     if (!this.pending) return;
     if (!this.pending.parse) return;
+    if(isReplyPage(message)){
+      try{const part=this.pending.pages.push(message);if(part.next){this.pending.next=part.next;this.pending.pump?.();return;}message=part.message;}
+      catch(error){this.pending.reject(error);return;}
+    }
     const value = this.pending.parse(message);
     if (value !== null) this.pending.match(value);
   }
@@ -126,7 +132,7 @@ export class PlugConnection extends EventTarget {
   }
   async request(message, parse, label = 'Status read', { mutation = false, timeout = this.timeout } = {}) {
     if (!allowedCommand(message, mutation, this.current)) throw new Error('Unsupported command; nothing sent.');
-    if (mutation && this.current?.identity !== 'NAMLNK12') throw new Error('Read and verify NAMLNK12 before editing.');
+    if (mutation && !['NAMLNK12','NAMLNK13'].includes(this.current?.identity)) throw new Error('Read and verify supported firmware before editing.');
     if (!this.connected) throw new Error('Plug disconnected.');
     if (this.pending) throw new Error('A read is already in progress.');
     if (this.writeStalled) throw new Error('A Bluetooth write did not finish. Disconnect and reconnect before retrying.');
@@ -137,7 +143,7 @@ export class PlugConnection extends EventTarget {
         if (this.pending !== pending) return;
         clearTimeout(pending.timer); this.pending = null; callback(value);
       };
-      const pending = { label, parse, mutation, writeDone: false, matched: false, value: null,
+      const pending = { label, parse, mutation, pages:new ReplyPages(), next:null, pumping:false, writeDone: false, matched: false, value: null,
         match: value => { pending.matched = true; pending.value = value; if (pending.writeDone) finish(resolve, value); },
         reject: error => finish(reject, error),
         timer: setTimeout(() => {
@@ -151,18 +157,27 @@ export class PlugConnection extends EventTarget {
         }, timeout)
       };
       this.pending = pending;
-      (async () => {
-        const wait = this.spacing - (Date.now() - this.lastWrite); if (wait > 0) await pause(wait);
-        // Zero timestamps match the known Mighty Plug Pro request frames.
-        const packets = message[0] === 176 ? [Uint8Array.from([128,128,...message])] : encodeSysEx(message, 0);
-        for (let index = 0; index < packets.length; index++) {
-          if (index) await pause(15);
-          this.assertSession(epoch); if (this.pending !== pending) return;
-          await this.writePacket(packets[index], pending, epoch, characteristic);
+      const transmit=async message=>{
+        const wait=this.spacing-(Date.now()-this.lastWrite);if(wait>0)await pause(wait);
+        const packets=message[0]===176?[Uint8Array.from([128,128,...message])]:encodeSysEx(message,0);
+        for(let index=0;index<packets.length;index++){
+          if(index)await pause(15);this.assertSession(epoch);if(this.pending!==pending)return;
+          await this.writePacket(packets[index],pending,epoch,characteristic);
         }
-        this.assertSession(epoch); if (this.pending !== pending) return;
-        pending.writeDone = true;
-        if (!parse || pending.matched) finish(resolve, pending.value);
+      };
+      pending.pump=()=>{
+        if(pending.pumping||!pending.writeDone||!pending.next||this.pending!==pending)return;
+        pending.pumping=true;
+        (async()=>{
+          while(pending.next&&this.pending===pending){const next=pending.next;pending.next=null;pending.writeDone=false;
+            await transmit(next);this.assertSession(epoch);if(this.pending!==pending)return;pending.writeDone=true;
+            if(pending.matched){finish(resolve,pending.value);return;}
+          }
+        })().catch(pending.reject).finally(()=>{pending.pumping=false;});
+      };
+      (async()=>{
+        await transmit(message);this.assertSession(epoch);if(this.pending!==pending)return;
+        pending.writeDone=true;if(!parse||pending.matched)finish(resolve,pending.value);else pending.pump();
       })().catch(pending.reject);
     });
   }
@@ -174,13 +189,17 @@ export class PlugConnection extends EventTarget {
   async snapshot() {
     const identity = await this.request(IDENTITY_REQUEST, parseIdentity, 'Reading firmware identity');
     this.record(`Identity: ${identity}`);
-    if (identity !== 'NAMLNK12') throw new Error(`The plug reports ${identity}. This preview needs NAMLNK12.`);
+    if (!['NAMLNK12','NAMLNK13'].includes(identity)) throw new Error(`The plug reports ${identity}. This preview needs NAMLNK12.`);
     const words = [];
     for (const page of [0, 1, 2, 4, 5, 9, 10, 23, 24, 25]) words[page] = await this.readPage(page);
     const chain = await this.request(CHAIN_REQUEST, chainParser(), 'Reading signal chain');
     if (await this.readPage(25) !== words[25] || await this.readPage(5) !== words[5])
       throw new Error('The preset changed while reading. Refresh to read it again.');
     const state = decodeSnapshot(words, chain, identity); validateEffects(state.effects);
+    if(identity==='NAMLNK13'){
+      const wire=fxRequest(0,state.active,1);const result=await this.request(wire,m=>fxReply(m,wire),'Reading FX blocks');
+      if(result.error||result.active!==state.active)throw new Error('FX snapshot changed. Refresh the plug.');state.fx=result.config;
+    }
     this.current = state; this.progress('Ready'); return state;
   }
   async refresh() {

@@ -1,3 +1,4 @@
+import { defaultFx } from '../src/fx.js';
 import { SysExDecoder,encodeSysEx } from '../src/ble-midi.js';
 import { identityFrame,pageFrame,chainFrame,statusWords } from './fixtures.js';
 // Independent byte builders matching the firmware record format.
@@ -21,12 +22,24 @@ export function tunerFrame(request,{generation=1,error=0,count=2048,frequency=11
 const ranges=[[13,16,15],[17,22,20],[31,42,36],[43,46,49],[47,52,54],[53,60,61],[61,64,70],[65,70,75]];
 export function editingBluetooth(options={}){
   const words=statusWords(),effects=chainFrame().slice(7,-1),bank=Array.from({length:7},(_,i)=>header(i,effects));
+  const extra=defaultFx(),bankFx=Array.from({length:7},()=>defaultFx());let pageCache=null,pageGeneration=0;
   let generation=0,saveCount=0,writeCount=0;const requests=[],writes=[],methods=[];
   const characteristic=new EventTarget();characteristic.properties={notify:true,write:true,writeWithoutResponse:true};characteristic.startNotifications=async()=>characteristic;
-  const reply=frame=>queueMicrotask(()=>{for(const packet of encodeSysEx(frame,0,options.replyMtu??20)){characteristic.value=packet.buffer;characteristic.dispatchEvent(new Event('characteristicvaluechanged'));}});
+  const emit=frame=>queueMicrotask(()=>{for(const packet of encodeSysEx(frame,0,options.replyMtu??20)){characteristic.value=packet.buffer;characteristic.dispatchEvent(new Event('characteristicvaluechanged'));}});
+  const pageReply=index=>{
+    const total=pageCache.length,count=Math.ceil(total/40);
+    emit([240,67,88,112,4,2,78,82,1,pageGeneration&127,pageGeneration>>>7,index,count,total&127,total>>>7,...pageCache.slice(index*40,(index+1)*40),247]);
+  };
+  const reply=frame=>{if(options.identity==='NAMLNK13'&&frame.length>64){pageCache=frame.slice(1,-1);pageGeneration=pageGeneration%16383+1;pageReply(0);}else emit(frame);};
   const decoder=new SysExDecoder(frame=>{
     const m=[...frame];requests.push(m);options.onRequest?.(m,{words,effects,bank});
-    if(m.length===5){reply(identityFrame());return;}
+    if(m.length===5){reply(identityFrame(options.identity));return;}
+    if(m[7]===82){if(options.dropPage===m[11])return;if(m[9]+128*m[10]!==pageGeneration)return;pageReply(m[11]);return;}
+    if(m[7]===70){
+      const op=m[9],slot=m[10];let error=0;
+      if(op===1){const model=m.slice(14,19).reduce((a,b,i)=>a+b*2**(7*i),0);if(slot!==(words[25]&255)||model!==words[5])error=2;else extra.splice(0,32,...m.slice(19,-1));}
+      reply([...m.slice(0,9),op|64,slot,m[11],m[12],error,(words[25]&255)===255?127:words[25]&255,...(op===2?bankFx[slot]:extra),247]);return;
+    }
     if(m.length===7){for(let p=0;p<3;p++)reply([240,67,88,112,12,2,words[25]&255,48+p,...effects.slice(p*50,(p+1)*50),247]);return;}
     if(m[7]===80){reply(pageFrame(m[8],words[m[8]]));return;}
     if(m[7]===65){words[23]=m[8];return;}
@@ -34,10 +47,10 @@ export function editingBluetooth(options={}){
     if(m[4]===13){effects.splice(90,9,...m.slice(7,16));return;}
     if(m[7]===83){
       const q=unpack(m.slice(9,-1)),op=q[5],slot=q[6];let error=0;
-      if(op===3){effects.splice(0,128,...bank[slot].slice(128));words[5]=get32(bank[slot],16);words[24]=((words[24]&0xffffff00)|get32(bank[slot],24))>>>0;words[25]=(words[25]&0xffffff00)|slot;}
+      if(op===3){extra.splice(0,32,...bankFx[slot]);effects.splice(0,128,...bank[slot].slice(128));words[5]=get32(bank[slot],16);words[24]=((words[24]&0xffffff00)|get32(bank[slot],24))>>>0;words[25]=(words[25]&0xffffff00)|slot;}
       if(op===2){
         if(get32(q,16)!==words[5]||get32(q,20)!==crc(effects))error=2;
-        else{saveCount++;const h=header(slot,effects,get32(q,28));set32(h,12,get32(bank[slot],12)+1);set32(h,16,words[5]);set32(h,20,get32(q,24));h.set(q.slice(32,64),32);h.set(q.slice(64,128),64);bank[slot]=h;words[23]=0;}
+        else{saveCount++;bankFx[slot]=[...extra];const h=header(slot,effects,get32(q,28));set32(h,12,get32(bank[slot],12)+1);set32(h,16,words[5]);set32(h,20,get32(q,24));h.set(q.slice(32,64),32);h.set(q.slice(64,128),64);bank[slot]=h;words[23]=0;}
       }
       options.onPreset?.(op,slot,{words,effects,bank});
       if(op===2&&options.dropSaveReply)return;
@@ -59,5 +72,5 @@ export function editingBluetooth(options={}){
   };
   characteristic.writeValueWithoutResponse=d=>write('without',d);characteristic.writeValueWithResponse=d=>write('with',d);
   const device=new EventTarget();device.gatt={connected:false,async connect(){this.connected=true;return this;},async getPrimaryService(){return {getCharacteristic:async()=>characteristic};},disconnect(){this.connected=false;device.dispatchEvent(new Event('gattserverdisconnected'));}};
-  return {bluetooth:{requestDevice:async()=>device},device,characteristic,words,effects,bank,requests,writes,methods,get saveCount(){return saveCount;},get writeCount(){return writeCount;}};
+  return {bluetooth:{requestDevice:async()=>device},device,characteristic,words,effects,bank,extra,bankFx,requests,writes,methods,get saveCount(){return saveCount;},get writeCount(){return writeCount;}};
 }

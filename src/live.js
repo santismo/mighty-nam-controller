@@ -5,9 +5,9 @@ export class LiveEdits {
     Object.assign(this,{editor,changed,accepted,failed});this.reset(null);
   }
   reset(state){clearTimeout(this.timer);this.epoch=(this.epoch||0)+1;this.state=state;this.target=null;this.pending=false;this.blocked=false;}
-  update(effects,buffer){
+  update(effects,buffer,fx=null){
     if(this.blocked||!this.state)throw new Error('Refresh the plug before editing.');
-    this.target={effects:[...effects],buffer};
+    this.target={effects:[...effects],buffer,fx:fx?[...fx]:null};
     if(!this.pending){this.pending=true;const epoch=this.epoch;this.timer=setTimeout(()=>this.start(epoch),60);}
     this.changed();
   }

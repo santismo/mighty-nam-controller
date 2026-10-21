@@ -59,7 +59,7 @@ export function decodeSnapshot(words, chain, identity) {
   if ([0, 1, 2, 4, 5, 9, 10, 23, 24, 25].some(page =>
     !Number.isInteger(words[page]) || words[page] < 0 || words[page] > 0xffffffff))
     throw new Error('The plug returned an incomplete status.');
-  if (identity !== 'NAMLNK12' || words[0] !== 0x4e4c4b31 || words[1] !== 1 || words[2] !== 1)
+  if (!['NAMLNK12','NAMLNK13'].includes(identity) || words[0] !== 0x4e4c4b31 || words[1] !== 1 || words[2] !== 1)
     throw new Error('The plug returned an unsupported status.');
   const listen = words[23], buffer = words[24], bank = words[25];
   if ((listen & ~7) !== 0 || (listen & 6) === 6 || ((listen & 4) !== 0 && !(listen & 1)) ||
