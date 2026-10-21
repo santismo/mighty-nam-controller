@@ -1,10 +1,10 @@
-import { fxRequest, fxReply } from './fx.js?v=0.6.4';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.4';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.6.4';
-import { detectPitch, pitchReading } from './tuner.js?v=0.6.4';
-import { modelPacket,modelReply } from './model-wire.js?v=0.6.4';
-import { validateModel,includesCab } from './model.js?v=0.6.4';
-import { put,crc32,nameBytes } from './commands.js?v=0.6.4';
+import { fxRequest, fxReply } from './fx.js?v=0.6.5';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.5';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.6.5';
+import { detectPitch, pitchReading } from './tuner.js?v=0.6.5';
+import { modelPacket,modelReply } from './model-wire.js?v=0.6.5';
+import { validateModel,includesCab } from './model.js?v=0.6.5';
+import { put,crc32,nameBytes } from './commands.js?v=0.6.5';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -37,7 +37,7 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
-    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
+    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }
   async fx(op,slot,config=null,model=0){
@@ -69,21 +69,31 @@ export class PlugEditor {
     return now;
   }
   async send(message,label){await this.link.request(message,null,label,{mutation:true});}
+  async preserveOutput(state,expectedListening){
+    // Resume only after all operation-specific model/control checks passed.
+    if(state.listening===expectedListening)return state;
+    if(!expectedListening||state.faults||!state.running||!state.loaded)throw new Error('Output changed unexpectedly. Refresh the plug.');
+    await this.send(listenCommand(true),'Resuming plug output');
+    const after=await this.link.snapshot();
+    if(!after.listening||after.faults||!after.running||after.modelCrc!==state.modelCrc||after.active!==state.active||after.buffer!==state.buffer||!same(after.effects,state.effects)||!same(after.fx,state.fx)){try{await this.send(listenCommand(false),'Output changed during resume');}catch{}throw new Error('Playback was not confirmed. Refresh the plug.');}
+    return after;
+  }
+  syncGlobalBuffer(state){if(state.globalBuffer&&!state.bufferStorageError)for(const p of this.bank)if(p?.occupied)p.buffer=state.buffer;return state;}
   async applyInternal(expected,effects,buffer){
     validateEffects(effects,expected.identity);if(![8,16,32].includes(buffer))throw new Error('Invalid buffer.');
-    const plan=editPlan(expected.effects,effects);await this.current(expected);
+    const plan=editPlan(expected.effects,effects);const before=await this.current(expected);
     for(const message of plan)await this.send(message,'Applying signal chain');
     if(buffer!==expected.buffer)await this.send(bufferCommand(buffer),'Changing buffer');
     await pause(150);const result=await this.link.snapshot();
     if(result.active!==expected.active||result.modelCrc!==expected.modelCrc||result.buffer!==buffer||!same(result.effects,effects)||result.faults||!result.running)throw new Error('The edited chain was not confirmed. Refresh before trying again.');
-    if(buffer!==expected.buffer&&result.listening)throw new Error('The plug did not confirm mute after the buffer change.');
-    return result;
+    if(result.bufferStorageError)throw new Error('The global buffer was not saved. Refresh before retrying.');
+    return this.syncGlobalBuffer(await this.preserveOutput(result,before.listening));
   }
   apply(expected,effects,buffer){return this.run(()=>this.applyInternal(expected,effects,buffer));}
   // Read the latest target before every write. A slider never builds a backlog
   // of old positions, and only explicit save() calls write the onboard bank.
   live(expected,latest){return this.run(async()=>{
-    let state=await this.current(expected),effects=[...state.effects],buffer=state.buffer,fx=state.fx?[...state.fx]:null,lastGuard=Date.now();
+    let state=await this.current(expected),effects=[...state.effects],buffer=state.buffer,fx=state.fx?[...state.fx]:null,lastGuard=Date.now();const wasListening=state.listening;
     for(;;){
       const target=latest();validateEffects(target.effects,expected.identity);
       if(![8,16,32].includes(target.buffer))throw new Error('Invalid buffer.');
@@ -106,7 +116,7 @@ export class PlugEditor {
       await pause(100);state=await this.link.snapshot();lastGuard=Date.now();
       if(state.active!==expected.active||state.modelCrc!==expected.modelCrc||state.buffer!==buffer||!same(state.effects,effects)||(fx&&!same(state.fx,fx))||state.faults||!state.running)
         throw new Error('Live changes were not confirmed. Refresh before editing again.');
-      const next=latest();if(same(next.effects,effects)&&next.buffer===buffer&&(!fx||same(next.fx,fx)))return state;
+      const next=latest();if(same(next.effects,effects)&&next.buffer===buffer&&(!fx||same(next.fx,fx))){if(state.bufferStorageError)throw new Error('The global buffer was not saved. Refresh before retrying.');return this.syncGlobalBuffer(await this.preserveOutput(state,wasListening));}
     }
   });}
   recall(slot){return this.run(async()=>{
@@ -128,12 +138,12 @@ export class PlugEditor {
     const checked=await this.preset(1,state.active),after=await this.link.snapshot();
     for(const entry of [saved,checked])if(!entry.occupied||entry.active!==state.active||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==(playOnBoot?1:0)||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
     if(state.fx&&(!same(saved.fx,state.fx)||!same(checked.fx,state.fx)||!same(after.fx,state.fx)))throw new Error('Saved FX readback did not match.');
-    if(saved.generation!==checked.generation||checked.generation<before.generation||after.listening||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==state.active||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
-    return after;
+    if(saved.generation!==checked.generation||checked.generation<before.generation||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==state.active||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
+    return this.preserveOutput(after,state.listening);
   });}
   loadModel(expected,model,{progress=()=>{},canceled=()=>false}={}){return this.run(async()=>{
     await validateModel(model);
-    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
+    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
     const before=await this.link.snapshot();
     if(before.active!==expected.active||before.modelCrc!==expected.modelCrc||before.buffer!==expected.buffer||!same(before.effects,expected.effects)||(expected.fx&&!same(before.fx,expected.fx))||before.faults)throw new Error('The plug changed. Refresh before loading a capture.');
     const epoch=this.link.epoch;let began=false,committed=false;const session=crypto.getRandomValues(new Uint32Array(1))[0]||1;
@@ -166,7 +176,7 @@ export class PlugEditor {
       if(state.active!==expected.active||state.modelCrc!==model.crc||state.listening||state.faults||!state.running||!same(state.effects,expected.effects)||!same(state.fx,expected.fx))throw new Error('The loaded capture was not confirmed. Refresh the plug.');
       const effects=[...state.effects];effects[3]&=63;if(includesCab(model))effects[9]|=64;
       state=await this.applyInternal(state,effects,state.buffer);this.activeCapture=model;
-      this.link.progress('Capture loaded · plug muted');return state;
+      state=await this.preserveOutput(state,before.listening);this.link.progress('Capture loaded');return state;
     }catch(error){
       if(epoch===this.link.epoch&&this.link.connected&&!this.link.writeStalled){
         if(began&&!committed)try{await exchange(5);this.clearTransfer();}catch{}
@@ -185,8 +195,8 @@ export class PlugEditor {
     body.splice(16,32,...model.sha.match(/../g).map(x=>parseInt(x,16)));const nameData=nameBytes(name);body.splice(48,nameData.length,...nameData);
     const saved=await this.preset(2,slot,body),checked=await this.preset(1,slot),after=await this.link.snapshot();
     for(const entry of [saved,checked])if(!entry.occupied||entry.modelCrc!==model.crc||entry.sha.map(x=>x.toString(16).padStart(2,'0')).join('')!==model.sha||entry.flags!==(playOnBoot?1:0)||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects)||!same(entry.fx,state.fx))throw new Error('Saved capture readback did not match. Refresh before saving again.');
-    if(saved.generation!==checked.generation||checked.generation<before.generation||after.listening||after.faults||!after.running||after.modelCrc!==model.crc||after.active!==slot||!same(after.effects,effects)||!same(after.fx,state.fx))throw new Error('Saved capture was not fully confirmed. Refresh before saving again.');
-    return after;
+    if(saved.generation!==checked.generation||checked.generation<before.generation||after.faults||!after.running||after.modelCrc!==model.crc||after.active!==slot||!same(after.effects,effects)||!same(after.fx,state.fx))throw new Error('Saved capture was not fully confirmed. Refresh before saving again.');
+    return this.preserveOutput(after,state.listening);
   });}
   listen(enabled){return this.run(async()=>{
     const state=await this.link.snapshot();if(enabled&&(!state.running||state.faults||!state.loaded))throw new Error('Load a healthy onboard preset before listening.');
@@ -218,7 +228,7 @@ export class PlugEditor {
     }
   }
   tune(reference=440,{canceled=()=>false,onProgress=()=>{},fast=false}={}){return this.run(async()=>{
-    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
+    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
     this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');

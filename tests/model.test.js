@@ -33,12 +33,12 @@ test('model wire is bounded and allowed only for NAMLNK14; replies require sessi
   assert.equal(modelReply(wire,q).capabilities,3);assert.equal(modelReply(wire,modelPacket(4,1)),null);wire[29]^=1;assert.equal(modelReply(wire,q),null);
 });
 const setup=async(options={})=>{const fake=editingBluetooth({identity:'NAMLNK14',...options}),link=new PlugConnection(fake.bluetooth,100,0,0),editor=new PlugEditor(link);await link.connect();await editor.readBank();return {fake,link,editor};};
-for (const identity of ['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17']) test(`${identity} BLE capture transfer activates, preserves FX and saves only on request`,async()=>{
+for (const identity of ['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18']) test(`${identity} BLE capture transfer activates, preserves FX and saves only on request`,async()=>{
   const {fake,link,editor}=await setup({identity}),model=await fixtureModel(3),bank=fake.bank.map(x=>[...x]),extra=[...fake.extra],progress=[];fake.words[23]=1;
   const state=await editor.loadModel(link.current,model,{progress:n=>progress.push(n)});
-  assert.equal(state.modelCrc,model.crc);assert.equal(state.listening,false);assert.equal(state.effects[3]&64,0);assert.equal(state.effects[9]&64,64);assert.deepEqual(state.fx,extra);assert.equal(progress.length,32);assert.equal(progress.at(-1),8192);assert.deepEqual(fake.bank.map(x=>[...x]),bank);assert.equal(fake.saveCount,0);assert.equal(editor.activeCapture.sha,model.sha);
+  assert.equal(state.modelCrc,model.crc);assert.equal(state.listening,true);assert.equal(state.effects[3]&64,0);assert.equal(state.effects[9]&64,64);assert.deepEqual(state.fx,extra);assert.equal(progress.length,32);assert.equal(progress.at(-1),8192);assert.deepEqual(fake.bank.map(x=>[...x]),bank);assert.equal(fake.saveCount,0);assert.equal(editor.activeCapture.sha,model.sha);
   const next=await editor.saveCapture(state,state.effects,state.buffer,'New capture',3,model);assert.equal(next.active,3);assert.equal(fake.saveCount,1);assert.equal(editor.bank[3].name,'New capture');assert.equal(editor.bank[3].flags,1);
-  const boot=await editor.saveCapture(next,next.effects,next.buffer,'New capture',3,model,{playOnBoot:false});assert.equal(editor.bank[3].flags,0);assert.equal(boot.listening,false);
+  const boot=await editor.saveCapture(next,next.effects,next.buffer,'New capture',3,model,{playOnBoot:false});assert.equal(editor.bank[3].flags,0);assert.equal(boot.listening,true);
   for(const i of [0,1,2,4,5,6])assert.deepEqual([...fake.bank[i]],bank[i]);link.close();
 });
 test('cancel, preset changes, lost replies and bad commit checksums cannot report active or save',async()=>{

@@ -64,15 +64,16 @@ export function decodeSnapshot(words, chain, identity) {
   if ([0, 1, 2, 4, 5, 9, 10, 23, 24, 25].some(page =>
     !Number.isInteger(words[page]) || words[page] < 0 || words[page] > 0xffffffff))
     throw new Error('The plug returned an incomplete status.');
-  if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17'].includes(identity) || words[0] !== 0x4e4c4b31 || words[1] !== 1 || words[2] !== 1)
+  if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18'].includes(identity) || words[0] !== 0x4e4c4b31 || words[1] !== 1 || words[2] !== 1)
     throw new Error('The plug returned an unsupported status.');
   const listen = words[23], buffer = words[24], bank = words[25];
+  const globalBuffer=identity==='NAMLNK18',format=(buffer>>>8)&255,bufferStorageError=globalBuffer?format>>>4:0;
   if ((listen & ~7) !== 0 || (listen & 6) === 6 || ((listen & 4) !== 0 && !(listen & 1)) ||
-      (buffer >>> 16) !== 48000 || ((buffer >>> 8) & 255) !== 1 || ![8, 16, 32].includes(buffer & 255) ||
+      (buffer >>> 16) !== 48000 || (globalBuffer?((format&15)!==2||bufferStorageError>4):format!==1) || ![8, 16, 32].includes(buffer & 255) ||
       (bank >>> 24) !== 1 || (bank & 0x00ff0000) !== 0 || ((bank >>> 8) & 255) > 127 ||
       !([0, 1, 2, 3, 4, 5, 6, 255].includes(bank & 255)) || ![0, 1].includes(words[9]))
     throw new Error('The plug returned an invalid status.');
-  return { identity, buffer: buffer & 255, sampleRate: buffer >>> 16, active: bank & 255,
+  return { identity, globalBuffer, bufferStorageError, buffer: buffer & 255, sampleRate: buffer >>> 16, active: bank & 255,
     occupied: (bank >>> 8) & 127, listening: Boolean(listen & 1), settling: Boolean(listen & 2),
     running: Boolean(words[9]), loaded: words[5] !== 0, modelCrc: words[5], faults: words[4] + words[10], ...chain };
 }
