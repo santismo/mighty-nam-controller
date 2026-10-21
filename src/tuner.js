@@ -17,6 +17,10 @@ export function detectPitch(samples,reference=440) {
   for(let i=Math.max(2,expected-radius);i<=Math.min(window-2,expected+radius);i++){const d=difference(i);if(d<minimum){minimum=d;best=i;}}
   const frequency=12000*multiple/(best+offset(difference(best-1),minimum,difference(best+1)));
   if(!Number.isFinite(frequency)||frequency<40||frequency>1400)return null;
+  return pitchReading(frequency,reference,1-values[lag]);
+}
+export function pitchReading(frequency,reference=440,confidence=1){
+  if(!Number.isFinite(frequency)||frequency<40||frequency>1400||!Number.isFinite(reference)||reference<430||reference>450)return null;
   const note=69+12*Math.log2(frequency/reference),midi=Math.round(note),cents=(note-midi)*100;
-  return {frequency,cents,midi,note:['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'][midi%12],octave:Math.floor(midi/12)-1,inTune:Math.abs(cents)<=3,confidence:1-values[lag]};
+  return {frequency,cents,midi,note:['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'][midi%12],octave:Math.floor(midi/12)-1,inTune:Math.abs(cents)<=3,confidence};
 }

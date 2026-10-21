@@ -1,10 +1,10 @@
-import { fxRequest, fxReply } from './fx.js?v=0.6.1';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.1';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply } from './commands.js?v=0.6.1';
-import { detectPitch } from './tuner.js?v=0.6.1';
-import { modelPacket,modelReply } from './model-wire.js?v=0.6.1';
-import { validateModel,includesCab } from './model.js?v=0.6.1';
-import { put,crc32,nameBytes } from './commands.js?v=0.6.1';
+import { fxRequest, fxReply } from './fx.js?v=0.6.2';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.6.2';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.6.2';
+import { detectPitch, pitchReading } from './tuner.js?v=0.6.2';
+import { modelPacket,modelReply } from './model-wire.js?v=0.6.2';
+import { validateModel,includesCab } from './model.js?v=0.6.2';
+import { put,crc32,nameBytes } from './commands.js?v=0.6.2';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -37,7 +37,7 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
-    if(['NAMLNK13','NAMLNK14'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
+    if(['NAMLNK13','NAMLNK14','NAMLNK15'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }
   async fx(op,slot,config=null,model=0){
@@ -133,7 +133,7 @@ export class PlugEditor {
   });}
   loadModel(expected,model,{progress=()=>{},canceled=()=>false}={}){return this.run(async()=>{
     await validateModel(model);
-    if(expected.identity!=='NAMLNK14')throw new Error('Bluetooth capture loading requires NAMLNK14.');
+    if(!['NAMLNK14','NAMLNK15'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
     const before=await this.link.snapshot();
     if(before.active!==expected.active||before.modelCrc!==expected.modelCrc||before.buffer!==expected.buffer||!same(before.effects,expected.effects)||(expected.fx&&!same(before.fx,expected.fx))||before.faults)throw new Error('The plug changed. Refresh before loading a capture.');
     const epoch=this.link.epoch;let began=false,committed=false;const session=crypto.getRandomValues(new Uint32Array(1))[0]||1;
@@ -193,7 +193,32 @@ export class PlugEditor {
     await this.send(listenCommand(enabled),enabled?'Enabling plug output':'Muting plug');
     const after=await this.link.snapshot();if(after.listening!==enabled)throw new Error('Plug output state was not confirmed.');return after;
   });}
+  async compactTune(reference,{canceled,onProgress}){
+    if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
+    const epoch=this.link.epoch;
+    const check=()=>{if(canceled())throw Object.assign(new Error('Tuner stopped.'),{code:'tuner-canceled'});};
+    const request=async op=>{
+      const q=compactTunerRequest(op,this.token()%16383+1);
+      const result=await this.link.request(q,m=>compactTunerReply(m,q),op===3?'Capturing fresh note':op===4?'Reading pitch':'Stopping tuner',{mutation:true});
+      if(result.error&&!(op===4&&result.error===1))throw new Error('The plug could not read pitch. Keep output muted while tuning.');return result;
+    };
+    try{
+      check();const start=await request(3);await pause(90);check();
+      for(let attempt=0;attempt<8;attempt++){
+        const result=await request(4);check();
+        if(result.generation!==start.generation)throw new Error('Tuner capture changed. Try again.');
+        if(!result.error)return {reading:result.frequency?pitchReading(result.frequency,reference,result.confidence):null,sampleCount:1024,compact:true};
+        await pause(20);check();
+      }
+      throw new Error('Tuner capture did not finish.');
+    }finally{
+      // A successful capture already stops itself. Send Stop only on cancellation;
+      // starting the next capture replaces the finished immutable sample window.
+      if(canceled()&&epoch===this.link.epoch&&this.link.connected&&!this.link.writeStalled)await request(5);
+    }
+  }
   tune(reference=440,{canceled=()=>false,onProgress=()=>{},fast=false}={}){return this.run(async()=>{
+    if(fast&&this.link.current.identity==='NAMLNK15')return this.compactTune(reference,{canceled,onProgress});
     this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');

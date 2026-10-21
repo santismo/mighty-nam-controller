@@ -1,7 +1,7 @@
-import { isFxRequest } from './fx.js?v=0.6.1';
-import { modelRequest } from './model-wire.js?v=0.6.1';
-import { isReadOnlyRequest } from './protocol.js?v=0.6.1';
-import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.6.1';
+import { isFxRequest } from './fx.js?v=0.6.2';
+import { modelRequest } from './model-wire.js?v=0.6.2';
+import { isReadOnlyRequest } from './protocol.js?v=0.6.2';
+import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.6.2';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -73,7 +73,7 @@ export const listenCommand=enabled=>[240,67,88,112,4,2,78,65,enabled?1:0,247];
 export const bufferCommand=samples=>[240,67,88,112,4,2,78,66,samples,247];
 export function allowedCommand(m,mutation=false,current=null) {
   if(isReadOnlyRequest(m))return true;
-  if(modelRequest(m))return mutation&&current?.identity==='NAMLNK14';
+  if(modelRequest(m))return mutation&&['NAMLNK14','NAMLNK15'].includes(current?.identity);
   if(isFxRequest(m,mutation,current))return true;
   try{if(prefix(m,NS)){const raw=rawPreset(m);return raw[5]===1||mutation;}}catch{return false;}
   if(!mutation)return false;
@@ -85,6 +85,20 @@ export function allowedCommand(m,mutation=false,current=null) {
   }
   if(m.length===17&&prefix(m,[240,67,88,112,13,1,9])&&m[16]===247)return validOrder(m.slice(7,16));
   if(m.length===10&&prefix(m,[240,67,88,112,4,2,78])&&m[9]===247)return (m[7]===65&&[0,1].includes(m[8]))||(m[7]===66&&[8,16,32].includes(m[8]));
+  if(m.length===14&&prefix(m,NU)&&m[9]>=3){try{return current?.identity==='NAMLNK15'&&same(m,compactTunerRequest(m[9],m[11]+128*m[12]));}catch{return false;}}
   if(m.length===14&&prefix(m,NU)){try{return same(m,tunerRequest(m[9],m[10],m[11]+128*m[12]));}catch{return false;}}
   return false;
+}
+
+export function compactTunerRequest(op,nonce) {
+  if(![3,4,5].includes(op)||!Number.isInteger(nonce)||nonce<1||nonce>16383)throw new Error('Invalid compact tuner request.');
+  return [...NU,op,0,nonce&127,nonce>>>7,247];
+}
+export function compactTunerReply(wire,request){
+  if(wire.length!==42||!prefix(wire,[240,67,88,112,4,2,78,86,2])||wire.at(-1)!==247)return null;
+  let raw;try{raw=unpack7(wire.slice(9,-1));}catch{return null;}
+  if(raw.length!==28||word(raw,0)!==0x32554e4d||raw[4]!==2||raw[5]!==(request[9]|128)||raw[6]||![0,1,3].includes(raw[7])||word(raw,8)!==request[11]+128*request[12]||word(raw,24)!==crc32(raw.slice(0,24)))return null;
+  const frequency=word(raw,16)/1000,confidence=word(raw,20)/1000000;
+  if((frequency!==0&&(frequency<40||frequency>1400))||confidence>1)return null;
+  return {error:raw[7],generation:word(raw,12),frequency,confidence};
 }

@@ -1,11 +1,11 @@
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.6.1';
-import { PlugConnection } from './device.js?v=0.6.1';
-import { PlugEditor } from './editor.js?v=0.6.1';
-import { LiveEdits } from './live.js?v=0.6.1';
-import { AutoTuner } from './auto-tuner.js?v=0.6.1';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.6.1';
-import { nameBytes } from './commands.js?v=0.6.1';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.6.1';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.6.2';
+import { PlugConnection } from './device.js?v=0.6.2';
+import { PlugEditor } from './editor.js?v=0.6.2';
+import { LiveEdits } from './live.js?v=0.6.2';
+import { AutoTuner } from './auto-tuner.js?v=0.6.2';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.6.2';
+import { nameBytes } from './commands.js?v=0.6.2';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.6.2';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const blocks={
@@ -24,6 +24,7 @@ const blocks={
 let snapshot=null,effects=null,fx=null,buffer=8,selected=3,busy=false,needsRefresh=false,operation=0,dragged=null;
 let queuedCapture=null,activeCapture=null,loadTicket=0,activeTicket=0,tuning=false,playOnBoot=true;
 const autoTuner=new AutoTuner({
+  interval:40,
   read:options=>editor.tune(Number($('reference').value),{...options,fast:true}),
   onReading:({reading})=>showPitch(reading),
   onProgress:page=>{$('tuner-progress').textContent=`Reading guitar · ${page}/16`;},
@@ -53,6 +54,9 @@ function status(){
   $('connection-state').classList.toggle('online',connection.connected);
   $('connect').textContent=connection.connected?'Disconnect':'Connect';$('connect').disabled=waiting||!navigator.bluetooth?.requestDevice;
   $('refresh').disabled=!connection.connected||waiting||connection.writeStalled||$('tuner-dialog').open;
+  const occupied=editor.bank.filter(p=>p?.occupied);
+  $('preset-hint').hidden=!ready||occupied.length!==1;
+  $('preset-hint').textContent=occupied.length===1?`Only ${COLORS[occupied[0].slot]} is saved onboard. Save another color to cycle with the plug button.`:'';
   $('active-preset').textContent=ready?COLORS[snapshot.active]??'Unsaved':'—';
   $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
@@ -66,13 +70,13 @@ function status(){
   $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:'8 samples keeps the minimum output path. Buffer is saved separately for each color.';
   $('listen').disabled=!ready||waiting||needsRefresh||$('tuner-dialog').open;
   $('listen').textContent=snapshot?.listening?'Mute plug':'Listen on plug';
-  $('tuner').disabled=!canEdit()||waiting||editor.largeReplies!==true;
+  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&snapshot?.identity!=='NAMLNK15');
   $('feature-notice').hidden=!ready||!editor.bankWarning;
   $('feature-notice').textContent=editor.bankWarning;
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.6.1 · ${snapshot.identity}`:'0.6.1';
+  $('version').textContent=ready?`0.6.2 · ${snapshot.identity}`:'0.6.2';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -237,7 +241,7 @@ async function selectCapture(model){
 }
 async function transferCapture(model){
   const ticket=++loadTicket;
-  if(snapshot.identity!=='NAMLNK14')throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
+  if(!['NAMLNK14','NAMLNK15'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
   const state=await editor.loadModel(snapshot,model,{canceled:()=>ticket!==loadTicket,progress:(n,total)=>{const text=`Loading ${captureName(model)} · ${Math.round(n/total*100)}%`;message(text);tones.say(text);}});
   activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();$('tone-dialog').close();message(`${captureName(model)} is active. Plug muted; Save to plug keeps it after power-off.`);
 }
