@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {PlugConnection} from '../src/device.js';
+import {PlugEditor} from '../src/editor.js';
+import {editingBluetooth} from './editor-fixture.js';
+import {putNam,readNam,namRequest} from '../src/nam-controls.js';
+import {putNam as putRecord,readNam as readRecord} from '../src/usb-record.js';
+import {allowedCommand} from '../src/commands.js';
+import {supportsActiveChain,visibleOrder} from '../src/active-chain.js';
+
+test('NAMLNK22 pitch, NAM, USB gain, global buffer and color recall remain editable',async()=>{
+ const fake=editingBluetooth({identity:'NAMLNK22'}),link=new PlugConnection(fake.bluetooth,500,0,0),editor=new PlugEditor(link);
+ fake.words[23]=1;
+ await link.connect();await editor.readBank();let state=link.current;
+ assert.equal(supportsActiveChain(state.identity),true);
+ const fx=[...state.fx];fx[0]=1;fx[1]=1;fx[3]=24;fx[16]=1;fx[17]=1;fx[19]=0;
+ const effects=putRecord(putNam([...state.effects],[54,12,14,10,75,48]),[60]);
+ state=await editor.live(state,()=>({effects,fx,buffer:16}));
+ assert.deepEqual(readNam(state.effects),[54,12,14,10,75,48]);assert.deepEqual(readRecord(state.effects),[60]);
+ assert.deepEqual(state.fx,fx);assert.equal(state.buffer,16);assert.equal(state.listening,true);
+ assert.ok(visibleOrder(state.effects,state.fx,state.identity).includes(11));
+ assert.ok(visibleOrder(state.effects,state.fx,state.identity).includes(12));
+ await editor.save(state,state.effects,16,'Octave test');
+ await editor.recall(5);state=await editor.recall(0);
+ assert.equal(state.active,0);assert.equal(state.buffer,16);assert.deepEqual(state.fx,fx);
+ assert.equal(fake.requests.some(q=>q[7]===65),false,'Unexpected listen/mute command');
+ const q=namRequest(1,0,123,[48,12,12,12,100,48],state.modelCrc);
+ assert.equal(allowedCommand(q,true,{...state,identity:'NAMLNK23'}),false);
+ link.close();
+});

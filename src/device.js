@@ -1,10 +1,10 @@
-import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.8.0';
-import { fxRequest, fxReply } from './fx.js?v=0.8.0';
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.8.0';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.8.1';
+import { fxRequest, fxReply } from './fx.js?v=0.8.1';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.8.1';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.8.0';
-import { allowedCommand } from './commands.js?v=0.8.0';
-import { validateEffects } from './controls.js?v=0.8.0';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.8.1';
+import { allowedCommand } from './commands.js?v=0.8.1';
+import { validateEffects } from './controls.js?v=0.8.1';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -39,7 +39,7 @@ export class PlugConnection extends EventTarget {
     const s=this.current;
     const summary=s?`Firmware: ${s.identity}\nConfirmed buffer: ${s.buffer} samples at ${s.sampleRate} Hz\nBuffer scope: ${s.globalBuffer?'Global · saved on plug':'Per preset'}${s.bufferStorageError?' · storage error':''}\nActive color index: ${s.active}; capture CRC: ${s.modelCrc}; faults: ${s.faults}\nOutput: ${s.listening?'on':'muted'}; settling: ${s.settling}\nLive stock effects: ${s.effects.join(',')}\nLive FX A/B: ${s.fx?.join(',')??'unavailable'}\n`:'';
     const codec=s?.codec?`Converter startup: ${s.codec.verified?'short-delay setting verified':'setting unverified'}; ${s.codec.raw.toString(16)}\n`:'';
-    return `mighty-nam controller 0.8.0\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `mighty-nam controller 0.8.1\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {
@@ -135,7 +135,7 @@ export class PlugConnection extends EventTarget {
   }
   async request(message, parse, label = 'Status read', { mutation = false, timeout = this.timeout } = {}) {
     if (!allowedCommand(message, mutation, this.current)) throw new Error('Unsupported command; nothing sent.');
-    if (mutation && !['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(this.current?.identity)) throw new Error('Read and verify supported firmware before editing.');
+    if (mutation && !['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(this.current?.identity)) throw new Error('Read and verify supported firmware before editing.');
     if (!this.connected) throw new Error('Plug disconnected.');
     if (this.pending) throw new Error('A read is already in progress.');
     if (this.writeStalled) throw new Error('A Bluetooth write did not finish. Disconnect and reconnect before retrying.');
@@ -192,18 +192,18 @@ export class PlugConnection extends EventTarget {
   async snapshot() {
     const identity = await this.request(IDENTITY_REQUEST, parseIdentity, 'Reading firmware identity');
     this.record(`Identity: ${identity}`);
-    if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(identity)) throw new Error(`The plug reports ${identity}. This controller needs NAMLNK12 or later supported firmware.`);
+    if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(identity)) throw new Error(`The plug reports ${identity}. This controller needs NAMLNK12 or later supported firmware.`);
     const words = [];
     for (const page of [0, 1, 2, 4, 5, 9, 10, 23, 24, 25]) words[page] = await this.readPage(page);
     const chain = await this.request(CHAIN_REQUEST, chainParser(), 'Reading signal chain');
     if (await this.readPage(25) !== words[25] || await this.readPage(5) !== words[5])
       throw new Error('The preset changed while reading. Refresh to read it again.');
     const state = decodeSnapshot(words, chain, identity); validateEffects(state.effects,identity);
-    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(identity)){
+    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(identity)){
       const wire=fxRequest(0,state.active,1);const result=await this.request(wire,m=>fxReply(m,wire),'Reading FX blocks');
       if(result.error||result.active!==state.active)throw new Error('FX snapshot changed. Refresh the plug.');state.fx=result.config;
     }
-    if(['NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(identity)) {
+    if(['NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(identity)) {
       state.codec=decodeCodecStatus(await this.readPage(117));
       this.record(`Converter startup: ${state.codec.verified?'short-delay setting verified':'setting unverified'}; ${state.codec.raw.toString(16)}`);
     }

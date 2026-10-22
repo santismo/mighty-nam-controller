@@ -13,7 +13,7 @@ export function namReply(m,q){
  try{return {error:m[13],active:m[14]===127?255:m[14],config:validNam(m.slice(15,21))};}catch{return null;}
 }
 export function isNamRequest(m,mutation,current){
- try{if(current?.identity!=='NAMLNK21'||!same(m.slice(0,9),PREFIX)||m.slice(1,-1).some(x=>!Number.isInteger(x)||x<0||x>127))return false;
+ try{if(!['NAMLNK21','NAMLNK22'].includes(current?.identity)||!same(m.slice(0,9),PREFIX)||m.slice(1,-1).some(x=>!Number.isInteger(x)||x<0||x>127))return false;
  const op=m[9],slot=m[10]===127?255:m[10],crc=op?m.slice(14,19).reduce((n,v,i)=>n+v*2**(7*i),0):0;
  return same(m,namRequest(op,slot,m[11]+128*m[12],op?m.slice(19,-1):null,crc))&&(!op||mutation&&slot===current.active&&crc===current.modelCrc);
  }catch{return false;}

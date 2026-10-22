@@ -1,6 +1,6 @@
-import { catalog } from './catalog.js?v=0.8.0';
+import { catalog } from './catalog.js?v=0.8.1';
 export { catalog };
-export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(identity);
+export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(identity);
 const cutLabel=(v,high)=>{if(v===0)return 'Off';const hz=(high?1000:20)*Math.pow(high?20:50,(v-1)/99);return hz>=1000?`${(hz/1000).toFixed(2)} kHz`:`${Math.round(hz)} Hz`;};
 const cutEq={id:4,name:'High / Low Cut',parameters:[false,true].map((high,i)=>({name:high?'High Cut':'Low Cut',cc:31+i,index:36+i,default:0,labels:Array.from({length:101},(_,v)=>cutLabel(v,high))}))};
 export const effectChoices=(id,identity)=>id===4&&hasCutEq(identity)?[...catalog[id],cutEq]:catalog[id]??[];
@@ -35,7 +35,7 @@ export function editPlan(before,after,identity=null) {
   if((before[3]&63)!==(after[3]&63)) throw new Error('The NAM capture cannot be changed with an effect command.');
   const allowed=new Set([84,1,2,3,4,5,6,7,8,9,...Array.from({length:9},(_,i)=>90+i)]), messages=[];
   for(const [first,last] of RANGES) for(let cc=first;cc<=last;cc++) allowed.add(parameterIndex(cc));
-  if(identity==='NAMLNK21')for(let i=27;i<=35;i++)allowed.add(i);
+  if(['NAMLNK21','NAMLNK22'].includes(identity))for(let i=27;i<=35;i++)allowed.add(i);
   if(before.some((v,i)=>v!==after[i]&&!allowed.has(i))) throw new Error('An unrelated setting changed.');
   if(before[84]!==after[84])messages.push([176,73,after[84]]);
   for(let id=1;id<=9;id++) if(before[id]!==after[id]) messages.push([176,id,after[id]]);

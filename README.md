@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.8.0)
+[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.8.1)
 
 A Bluetooth controller for mighty-nam. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**.
 
@@ -32,7 +32,7 @@ Model transfers support NAMLNK14 through NAMLNK17. FX A/B support NAMLNK13–17;
 
 ## NAM controls and browsing — controller 0.7.2
 
-On NAMLNK21, select NAM to adjust input/output gain (−24 to +24 dB), bass/middle/treble (−12 to +12 dB), and wet/dry mix. Changes apply live with confirmed readback; Save to plug keeps them with the color. Older firmware keeps its existing controls. NAMLNK21 is staged and offline-tested, not yet installed or verified with physical USB audio.
+On NAMLNK21/22, select NAM to adjust input/output gain (−24 to +24 dB), bass/middle/treble (−12 to +12 dB), and wet/dry mix. Changes apply live with confirmed readback; Save to plug keeps them with the color. Older firmware keeps its existing controls. NAMLNK21 is staged and offline-tested, not yet installed or verified with physical USB audio.
 
 Loading a capture keeps the Captures browser open, preserving the current details, filters and scroll position. The selected model is marked active after the plug confirms it. Keep browsing to try another capture, or close the browser when finished. Offline downloads also keep the browser open; close it and connect to send the queued capture. The official TONE3000 sign-in/picker still returns to this controller page as before.
 
@@ -83,3 +83,5 @@ The minimal black interface uses effect colors for blocks and controls. Tap any 
 On the refreshed NAMLNK21 candidate, **USB recording gain** adjusts processed guitar sent to the computer from −24 to +24 dB in 0.5 dB steps, independently of headphone Master volume. It starts at 0 dB, applies live with readback, and is kept with the color by Save to plug. Raising gain can clip a loud capture; use the recording meter in your DAW. The update also revises Auto Wah’s envelope sweep/resonance in firmware. The page alone cannot change that sound.
 
 115 offline controller tests pass. The new firmware is staged; physical USB audio and listening checks remain pending. No device was accessed or auto-muted while making this update. The repository URL stays unchanged to preserve bookmarks and the registered TONE3000 redirect.
+
+Controller 0.8.1 recognizes NAMLNK22, including live pitch/octave controls, NAM controls, recording gain, global buffer and the compact tuner. Firmware remains a test build; physical pitch timing and listening are pending.
