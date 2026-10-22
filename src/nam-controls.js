@@ -2,8 +2,8 @@ const PREFIX=[240,67,88,112,4,2,78,71,1];
 const same=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
 export const neutralNam=()=>[48,12,12,12,100,48];
 export function validNam(c){if(!c||c.length!==6||c.some((v,i)=>!Number.isInteger(v)||v<0||v>[96,24,24,24,100,96][i]))throw new Error('Invalid NAM controls.');return c;}
-export function readNam(effects){return effects[33]===78&&effects[34]===1?validNam(effects.slice(27,33)):neutralNam();}
-export function putNam(effects,config){effects.splice(27,8,...validNam(config),78,1);return effects;}
+export function readNam(effects){return effects[33]===78&&[1,2].includes(effects[34])?validNam(effects.slice(27,33)):neutralNam();}
+export function putNam(effects,config){effects.splice(27,8,...validNam(config),78,effects[33]===78&&effects[34]===2?2:1);return effects;}
 export function namRequest(op,slot,nonce,config=null,model=0){
  if(![0,1].includes(op)||![0,1,2,3,4,5,6,255].includes(slot)||!Number.isInteger(nonce)||nonce<1||nonce>16383||!Number.isInteger(model)||model<0||model>0xffffffff)throw new Error('Invalid NAM request.');
  return [...PREFIX,op,slot===255?127:slot,nonce&127,nonce>>>7,...(op?[0,...Array.from({length:5},(_,i)=>Math.floor(model/2**(7*i))&127),...validNam(config)]:[]),247];

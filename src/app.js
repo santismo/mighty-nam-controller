@@ -1,15 +1,17 @@
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.7.3';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.7.3';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.7.3';
-import { PlugConnection } from './device.js?v=0.7.3';
-import { PlugEditor } from './editor.js?v=0.7.3';
-import { LiveEdits } from './live.js?v=0.7.3';
-import { AutoTuner } from './auto-tuner.js?v=0.7.3';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.7.3';
-import { nameBytes } from './commands.js?v=0.7.3';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.7.3';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.8.0';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.8.0';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.8.0';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.8.0';
+import { PlugConnection } from './device.js?v=0.8.0';
+import { PlugEditor } from './editor.js?v=0.8.0';
+import { LiveEdits } from './live.js?v=0.8.0';
+import { AutoTuner } from './auto-tuner.js?v=0.8.0';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.8.0';
+import { nameBytes } from './commands.js?v=0.8.0';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.8.0';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
+const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
 const blocks={
   11:['FX A','FX A','M4 12h16M12 4v16M5 5l14 14'],
   12:['FX B','FX B','M4 12h16M12 4v16M5 19L19 5'],
@@ -37,7 +39,7 @@ const autoTuner=new AutoTuner({
 const tones=new ToneBrowser({onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
 const live=new LiveEdits(editor,{
   changed:()=>status(),
-  accepted:state=>{snapshot=state;message(state.globalBuffer?'Live on plug. Buffer saved globally; Save keeps effect changes.':'Live on plug. Save to keep after power-off.');status();},
+  accepted:state=>{snapshot=state;message('Applied');status();},
   failed:error=>{needsRefresh=true;message(error.message,true);render();}
 });
 const chainView=new ChainView(localStorage);let retained=[],viewSlot=null;
@@ -69,6 +71,7 @@ function status(){
   $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
   $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
+  $('usb-record-control').hidden=snapshot?.identity!=='NAMLNK21';$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
   $('master-volume').disabled=!canEdit();$('master-volume').value=effects?.[84]??0;$('master-value').textContent=effects?`${effects[84]} %`:'—';
   $('buffer').disabled=!canEdit();$('buffer').value=String(buffer);
   const saved=editor.bank[snapshot?.active];
@@ -81,7 +84,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.7.3 · ${snapshot.identity}`:'0.7.3';
+  $('version').textContent=ready?`0.8.0 · ${snapshot.identity}`:'0.8.0';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -102,16 +105,16 @@ function render(){
     if(active)b.setAttribute('aria-current','true');b.append(el('span',undefined,'swatch'),el('span',index+1));item.append(b);return item;
   }));
   $('empty-chain').hidden=ready;$('chain').hidden=!ready;
-  $('chain-hint').textContent=ready?(compact()?`${shown().length} ${shown().length===1?'block':'blocks'} · select to edit`:'Tap a symbol to bypass · select a name to edit'):'Waiting for connection';
+  $('chain-hint').textContent=ready?(compact()?`${shown().length} ${shown().length===1?'block':'blocks'}`:''):'Waiting for connection';
   renderChain();detail();status();diagnostics();
 }
 function renderChain(){
   const scroll=$('chain').scrollLeft;$('chain').replaceChildren();if(!online())return;
-  if(compact())$('chain-hint').textContent=`${shown().length} ${shown().length===1?'block':'blocks'} · select to edit`;
+  if(compact())$('chain-hint').textContent=`${shown().length} ${shown().length===1?'block':'blocks'}`;
   if(compact()&&!shown().length)$('chain').append(el('p','Direct signal · add a block to begin.','secondary'));
   for(const id of shown()){
     const [name,short,path]=blocks[id],bypassed=id>9?!fx[(id-11)*16+1]:Boolean(effects[id]&64);
-    const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.draggable=true;
+    const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.dataset.effect=effectColors[id];block.draggable=true;
     const power=button('',()=>toggleBlock(id),`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
     const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');const line=document.createElementNS(icon.namespaceURI,'path');line.setAttribute('d',path);icon.append(line);power.append(icon);
     const select=button('',()=>{selected=id;renderChain();detail();status();},`Edit ${name}`);select.className='block-select';select.setAttribute('aria-pressed',String(selected===id));select.append(el('span',short),el('small',bypassed?'Bypassed':'On'));
@@ -123,6 +126,7 @@ function renderChain(){
   $('chain').scrollLeft=scroll;
 }
 function detail(){
+  $('block-detail').dataset.effect=effectColors[selected]??'nam';
   const ready=online()&&Boolean(selected),choice=ready&&selected<10?chosenEffect(effects,selected,snapshot?.identity):null;
   $('block-detail').hidden=online()&&compact()&&!selected;
   $('block-name').textContent=ready?blocks[selected][0]:'No block selected';
@@ -131,7 +135,7 @@ function detail(){
   $('block-state').setAttribute('aria-pressed',String(enabled));
   $('block-state').setAttribute('aria-label',ready?`${blocks[selected][0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
   $('block-state').title=ready?`Tap to ${enabled?'bypass':'enable'} ${blocks[selected][0]}`:'';
-  $('block-info').textContent=!ready?'Your chain will appear here.':selected===3?(activeCapture?'48 kHz · A2 Lite':snapshot.loaded?'Onboard capture. Choose another from TONE3000 or your phone library.':'Choose a 48 kHz A2 Lite capture.'):selected===4&&choice?.id===4?'12 dB/oct · set either control to Off to use the other alone.':'';
+  $('block-info').textContent=!ready?'':selected===3?(activeCapture?'A2 Lite':snapshot.loaded?'Onboard capture':''):selected===4&&choice?.id===4?'12 dB/oct':'';
   $('remove-block').hidden=!ready||!compact();$('change-block').hidden=!ready||!compact();
   $('nam-controls').hidden=!ready||selected!==3;tones.showActive(activeCapture);
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
@@ -179,7 +183,7 @@ async function recall(slot){
 }
 $('connect').addEventListener('click',async()=>{
   if(locked())return;if(connection.connected){clear();message('Disconnected.');return;}
-  await work('Choose your Mighty Plug Pro.',async()=>{accept(await connection.connect());await editor.readBank();accept(connection.current);message(editor.bankWarning?'Connected. Live controls are ready.':'Connected. Controls apply live; Save keeps your preset.');if(queuedCapture)await transferCapture(queuedCapture);});
+  await work('Choose your Mighty Plug Pro.',async()=>{accept(await connection.connect());await editor.readBank();accept(connection.current);message(editor.bankWarning?'Connected':'Connected');if(queuedCapture)await transferCapture(queuedCapture);});
 });
 $('refresh').addEventListener('click',()=>work('Reading the plug…',async()=>{await connection.refresh();await editor.readBank();accept(connection.current);message(editor.bankWarning?'Status updated. Live controls are ready.':'Status updated.');}));
 $('save').addEventListener('click',()=>{
@@ -188,7 +192,7 @@ $('save').addEventListener('click',()=>{
     $('save-color').replaceChildren(...COLORS.map((color,i)=>{const option=el('option',`${i+1}. ${color}${editor.bank[i]?.occupied?` · ${editor.bank[i].name}`:' · Empty'}`);option.value=i;return option;}));
     $('save-color').value=String(snapshot.active<7?snapshot.active:0);saveDestination();$('save-dialog').showModal();return;
   }
-  work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value,{playOnBoot}));message(`Saved to ${COLORS[snapshot.active]}. Startup output ${playOnBoot?'on':'muted'}. Playback ${snapshot.listening?'on':'muted'}.`);});
+  work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value,{playOnBoot}));message(`Saved · ${COLORS[snapshot.active]}`);});
 });
 function saveDestination(){const row=editor.bank[Number($('save-color').value)];$('save-destination').textContent=row?.occupied?`Replaces “${row.name}” in ${COLORS[row.slot]}.`:'This color is empty.';}
 $('save-color').addEventListener('change',saveDestination);$('close-save').addEventListener('click',()=>$('save-dialog').close());
@@ -222,6 +226,7 @@ $('close-add-block').addEventListener('click',()=>$('add-block-dialog').close())
 $('block-state').addEventListener('click',()=>toggleBlock(selected));
 $('preset-name').addEventListener('input',status);
 $('buffer').addEventListener('change',()=>{buffer=Number($('buffer').value);edit(()=>{},false);});
+$('usb-record-gain').addEventListener('input',()=>edit(next=>putRecord(next,[Number($('usb-record-gain').value)]),false));
 $('master-volume').addEventListener('input',()=>edit(next=>{next[84]=Number($('master-volume').value);},false));
 $('move-left').addEventListener('click',()=>{const order=shown();move(selected,order[order.indexOf(selected)-1]);});
 $('move-right').addEventListener('click',()=>{const order=shown();move(selected,order[order.indexOf(selected)+1]);});
@@ -286,7 +291,7 @@ async function transferCapture(model){
   const ticket=++loadTicket;
   if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
   const state=await editor.loadModel(snapshot,model,{canceled:()=>ticket!==loadTicket,progress:(n,total)=>{const text=`Loading ${captureName(model)} · ${Math.round(n/total*100)}%`;message(text);tones.say(text);}});
-  activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();tones.say(`${captureName(model)} is active. Keep browsing to try another capture.`);message(`${captureName(model)} is active. Playback ${state.listening?'on':'muted'}; Save to plug keeps it after power-off.`);
+  activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();tones.say(`${captureName(model)} is active. Keep browsing to try another capture.`);message(`${captureName(model)} loaded`);
 }
 $('cancel-capture').addEventListener('click',()=>{loadTicket++;queuedCapture=null;showQueued();message('Capture load canceled. The download is kept on this phone.');});
 window.addEventListener('pagehide',clear);$('browser-help').hidden=Boolean(navigator.bluetooth?.requestDevice);render();

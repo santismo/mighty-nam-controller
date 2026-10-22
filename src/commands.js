@@ -1,8 +1,9 @@
-import { isNamRequest } from './nam-controls.js?v=0.7.3';
-import { isFxRequest } from './fx.js?v=0.7.3';
-import { modelRequest } from './model-wire.js?v=0.7.3';
-import { isReadOnlyRequest } from './protocol.js?v=0.7.3';
-import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.7.3';
+import {isNamRequest as isRecordRequest} from './usb-record.js?v=0.8.0';
+import { isNamRequest } from './nam-controls.js?v=0.8.0';
+import { isFxRequest } from './fx.js?v=0.8.0';
+import { modelRequest } from './model-wire.js?v=0.8.0';
+import { isReadOnlyRequest } from './protocol.js?v=0.8.0';
+import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.8.0';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -76,7 +77,7 @@ export function allowedCommand(m,mutation=false,current=null) {
   if(isReadOnlyRequest(m))return true;
   if(modelRequest(m))return mutation&&['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(current?.identity);
   if(isFxRequest(m,mutation,current))return true;
-  if(isNamRequest(m,mutation,current))return true;
+  if(isRecordRequest(m,mutation,current)||isNamRequest(m,mutation,current))return true;
   try{if(prefix(m,NS)){const raw=rawPreset(m);return raw[5]===1||mutation;}}catch{return false;}
   if(!mutation)return false;
   if(m.length===3&&m[0]===176&&m.every(Number.isInteger)&&m[2]>=0&&m[2]<=127) {

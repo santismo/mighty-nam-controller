@@ -1,11 +1,12 @@
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.7.3';
-import { fxRequest, fxReply } from './fx.js?v=0.7.3';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.7.3';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.7.3';
-import { detectPitch, pitchReading } from './tuner.js?v=0.7.3';
-import { modelPacket,modelReply } from './model-wire.js?v=0.7.3';
-import { validateModel,includesCab } from './model.js?v=0.7.3';
-import { put,crc32,nameBytes } from './commands.js?v=0.7.3';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.8.0';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.8.0';
+import { fxRequest, fxReply } from './fx.js?v=0.8.0';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.8.0';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.8.0';
+import { detectPitch, pitchReading } from './tuner.js?v=0.8.0';
+import { modelPacket,modelReply } from './model-wire.js?v=0.8.0';
+import { validateModel,includesCab } from './model.js?v=0.8.0';
+import { put,crc32,nameBytes } from './commands.js?v=0.8.0';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -52,6 +53,12 @@ export class PlugEditor {
     const reply=await this.link.request(q,m=>namReply(m,q),'Applying NAM controls',{mutation:true});
     if(reply.error||reply.active!==state.active||!same(reply.config,config))throw new Error('NAM controls were not confirmed. Refresh the plug.');
   }
+  async recording(state,effects){
+    if(state.identity!=='NAMLNK21')throw new Error('USB recording gain require NAMLNK21.');
+    const config=readRecord(effects),q=recordRequest(1,state.active,this.token()%16383+1,config,state.modelCrc);
+    const reply=await this.link.request(q,m=>recordReply(m,q),'Applying USB recording gain',{mutation:true});
+    if(reply.error||reply.active!==state.active||!same(reply.config,config))throw new Error('USB recording gain were not confirmed. Refresh the plug.');
+  }
   readBank(){return this.run(async()=>{
     this.resetBank();
     try{
@@ -90,7 +97,8 @@ export class PlugEditor {
     validateEffects(effects,expected.identity);if(![8,16,32].includes(buffer))throw new Error('Invalid buffer.');
     const plan=editPlan(expected.effects,effects,expected.identity);const before=await this.current(expected);
     for(const message of plan)await this.send(message,'Applying signal chain');
-    if(!same(expected.effects.slice(27,35),effects.slice(27,35)))await this.nam(before,effects);
+    if(!same(readNam(expected.effects),readNam(effects)))await this.nam(before,effects);
+    if(effects[34]===2&&!same(expected.effects.slice(33,36),effects.slice(33,36)))await this.recording(before,effects);
     if(buffer!==expected.buffer)await this.send(bufferCommand(buffer),'Changing buffer');
     await pause(150);const result=await this.link.snapshot();
     if(result.active!==expected.active||result.modelCrc!==expected.modelCrc||result.buffer!==buffer||!same(result.effects,effects)||result.faults||!result.running)throw new Error('The edited chain was not confirmed. Refresh before trying again.');
@@ -106,14 +114,16 @@ export class PlugEditor {
       const target=latest();validateEffects(target.effects,expected.identity);
       if(![8,16,32].includes(target.buffer))throw new Error('Invalid buffer.');
       const plan=editPlan(effects,target.effects,expected.identity);
-      const namChanged=!same(effects.slice(27,35),target.effects.slice(27,35));
-      if(namChanged||plan.length||buffer!==target.buffer||(fx&&!same(fx,target.fx))){
+      const namChanged=!same(readNam(effects),readNam(target.effects));
+      const recordChanged=target.effects[34]===2&&!same(effects.slice(33,36),target.effects.slice(33,36));
+      if(namChanged||recordChanged||plan.length||buffer!==target.buffer||(fx&&!same(fx,target.fx))){
         if(Date.now()-lastGuard>250){
           const bank=await this.link.readPage(25),model=await this.link.readPage(5);
           if((bank&255)!==expected.active||model!==expected.modelCrc)throw new Error('Preset changed. Refresh before editing again.');
           lastGuard=Date.now();continue;
         }
-        if(namChanged){await this.nam(state,target.effects);effects.splice(27,8,...target.effects.slice(27,35));}
+        if(namChanged){await this.nam(state,target.effects);putNam(effects,readNam(target.effects));}
+        else if(recordChanged){await this.recording(state,target.effects);effects.splice(27,9,...target.effects.slice(27,36));}
         else if(plan.length){
           const command=plan[0];
           if(command[0]===240)await pause(80);

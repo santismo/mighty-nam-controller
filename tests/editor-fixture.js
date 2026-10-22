@@ -37,10 +37,15 @@ export function editingBluetooth(options={}){
     const m=[...frame];requests.push(m);options.onRequest?.(m,{words,effects,bank});
     if(m.length===5){reply(identityFrame(options.identity));return;}
     if(m[7]===82){if(options.dropPage===m[11])return;if(m[9]+128*m[10]!==pageGeneration)return;pageReply(m[11]);return;}
+    if(m[7]===86){
+      const active=words[25]&255,model=m.slice(14,19).reduce((n,v,i)=>n+v*2**(7*i),0);let error=0;
+      if(m[9]===1){if(model!==words[5]||(m[10]===127?255:m[10])!==active||m[19]>96)error=2;else{const tone=effects[33]===78&&[1,2].includes(effects[34])?effects.slice(27,33):[48,12,12,12,100,48];effects.splice(27,9,...tone,78,2,m[19]);}}
+      reply([...m.slice(0,9),m[9]|64,...m.slice(10,13),error,active,effects[33]===78&&effects[34]===2?effects[35]:48,247]);return;
+    }
     if(m[7]===71){
       const active=words[25]&255,model=m.slice(14,19).reduce((n,v,i)=>n+v*2**(7*i),0);let error=0;
-      if(m[9]===1){if(model!==words[5]||(m[10]===127?255:m[10])!==active)error=2;else effects.splice(27,8,...m.slice(19,25),78,1);}
-      const config=effects[33]===78&&effects[34]===1?effects.slice(27,33):[48,12,12,12,100,48];
+      if(m[9]===1){if(model!==words[5]||(m[10]===127?255:m[10])!==active)error=2;else effects.splice(27,8,...m.slice(19,25),78,effects[34]===2?2:1);}
+      const config=effects[33]===78&&[1,2].includes(effects[34])?effects.slice(27,33):[48,12,12,12,100,48];
       reply([...m.slice(0,9),m[9]|64,...m.slice(10,13),error,active,...config,247]);return;
     }
     if(m[7]===76){

@@ -1,8 +1,8 @@
-# NAM Plug controller
+# mighty-nam controller
 
-[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.7.1)
+[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.8.0)
 
-A Bluetooth controller for NAM Plug. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**.
+A Bluetooth controller for mighty-nam. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**.
 
 - Choose one of the seven colored onboard presets.
 - Tap a block's symbol to enable or bypass it. Tap its name for controls below the chain; the **Enabled / Bypassed** button there toggles the same block. Move blocks with the arrows or drag them on desktop.
@@ -38,7 +38,7 @@ Loading a capture keeps the Captures browser open, preserving the current detail
 
 Protocol tests and browser checks use simulated BLE; they do not establish physical phone-transfer performance. No firmware or capture files are included here.
 
-## Bypass and changing blocks — controller 0.7.3
+## Bypass and changing blocks — controller 0.8.0
 
 On NAMLNK20/21, tapping a block symbol or Enabled/Bypassed badge toggles processing while keeping the tile. **Remove** is separate. **Change block** swaps it for an available block type at the same position, retaining its enabled/bypassed state. The effect chooser selects an effect within that block; FX A and FX B each offer Pitch, Auto Wah and modulation choices. Each stock engine is available once, plus the two flexible FX engines.
 
@@ -50,7 +50,7 @@ Master volume replaces the manual Listen/Mute controls. Capture loading and tuni
 
 ## Active chains — controller 0.7.0
 
-With experimental NAMLNK20, the chain shows only effects that actually execute. Use **Add block** to insert an available effect; tap its symbol or the selected block's Remove control to remove it. Settings are retained when adding it again. Removing reverb or delay stops its tail. Controls apply live; **Save to plug** persists the chosen chain. Earlier firmware retains the full enable/bypass view.
+With experimental NAMLNK20, the chain shows only effects that actually execute. Use **Add block** to insert an available effect; use the selected block’s Remove control to remove it; tapping its symbol bypasses it while keeping its tile. Settings are retained when adding it again. Removing reverb or delay stops its tail. Controls apply live; **Save to plug** persists the chosen chain. Earlier firmware retains the full enable/bypass view.
 
 All existing NAMLNK19 controls and transfer paths remain supported, with NAMLNK20 added. Offline protocol and browser tests pass with simulated Bluetooth; physical NAMLNK20 validation is pending. Firmware installation is separate and clears the preset bank, so back up before updating. Fewer active processors do not by themselves establish lower measured audio latency.
 
@@ -75,3 +75,11 @@ No firmware images, captures, account sessions or private credentials are includ
 Serve this directory over HTTPS (or localhost for development). No build step. Run `npm test` with Node.js 20 or later.
 
 MIT · © 2026 santismo. Stock effect descriptions and display formatting are adapted from Mightier Amp; see [third-party licenses](THIRD-PARTY-LICENSES.txt).
+
+## mighty-nam — controller 0.8.0
+
+The minimal black interface uses effect colors for blocks and controls. Tap any saved color to recall that exact preset; it does not step through intervening colors.
+
+On the refreshed NAMLNK21 candidate, **USB recording gain** adjusts processed guitar sent to the computer from −24 to +24 dB in 0.5 dB steps, independently of headphone Master volume. It starts at 0 dB, applies live with readback, and is kept with the color by Save to plug. Raising gain can clip a loud capture; use the recording meter in your DAW. The update also revises Auto Wah’s envelope sweep/resonance in firmware. The page alone cannot change that sound.
+
+115 offline controller tests pass. The new firmware is staged; physical USB audio and listening checks remain pending. No device was accessed or auto-muted while making this update. The repository URL stays unchanged to preserve bookmarks and the registered TONE3000 redirect.
