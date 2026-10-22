@@ -1,13 +1,13 @@
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.7.2';
-import { supportsActiveChain, visibleOrder, membership, enabled } from './active-chain.js?v=0.7.2';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.7.2';
-import { PlugConnection } from './device.js?v=0.7.2';
-import { PlugEditor } from './editor.js?v=0.7.2';
-import { LiveEdits } from './live.js?v=0.7.2';
-import { AutoTuner } from './auto-tuner.js?v=0.7.2';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.7.2';
-import { nameBytes } from './commands.js?v=0.7.2';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.7.2';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.7.3';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.7.3';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.7.3';
+import { PlugConnection } from './device.js?v=0.7.3';
+import { PlugEditor } from './editor.js?v=0.7.3';
+import { LiveEdits } from './live.js?v=0.7.3';
+import { AutoTuner } from './auto-tuner.js?v=0.7.3';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.7.3';
+import { nameBytes } from './commands.js?v=0.7.3';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.7.3';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const blocks={
@@ -40,8 +40,10 @@ const live=new LiveEdits(editor,{
   accepted:state=>{snapshot=state;message(state.globalBuffer?'Live on plug. Buffer saved globally; Save keeps effect changes.':'Live on plug. Save to keep after power-off.');status();},
   failed:error=>{needsRefresh=true;message(error.message,true);render();}
 });
+const chainView=new ChainView(localStorage);let retained=[],viewSlot=null;
+function rememberView(){chainView.write(snapshot?.active,retained);}
 const compact=()=>supportsActiveChain(snapshot?.identity);
-const shown=()=>effects?visibleOrder(effects,fx,snapshot?.identity):[];
+const shown=()=>effects?visibleOrder(effects,fx,snapshot?.identity,retained):[];
 const pickVisible=()=>{if(compact()&&!shown().includes(selected))selected=shown()[0]??0;};
 const online=()=>Boolean(snapshot&&connection.connected);
 const canEdit=()=>online()&&!busy&&!tuning&&!needsRefresh&&!connection.writeStalled&&!$('tuner-dialog').open;
@@ -79,16 +81,16 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.7.2 · ${snapshot.identity}`:'0.7.2';
+  $('version').textContent=ready?`0.7.3 · ${snapshot.identity}`:'0.7.3';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
-  $('add-block').hidden=!online()||!compact();$('add-block').disabled=!canEdit()||!fullOrder(effects??[],fx).some(id=>!enabled(effects,fx,id));
+  $('add-block').hidden=!online()||!compact();$('add-block').disabled=!canEdit()||!fullOrder(effects??[],fx).some(id=>!shown().includes(id));
   $('move-left').disabled=!canEdit()||(effects&&(!selected||shown()[0]===selected));
   $('move-right').disabled=!canEdit()||(effects&&(!selected||shown().at(-1)===selected));
 }
-function accept(state,keepName=false){const name=keepName&&snapshot?.active===state.active&&snapshot?.modelCrc===state.modelCrc?$('preset-name').value:null;snapshot=state;effects=[...state.effects];fx=state.fx?[...state.fx]:null;if(selected>9&&!fx)selected=3;buffer=state.buffer;needsRefresh=false;live.reset(state);$('preset-name').value=name??editor.bank[state.active]?.name??COLORS[state.active]??'Preset';render();syncCapture();}
+function accept(state,keepName=false){const name=keepName&&snapshot?.active===state.active&&snapshot?.modelCrc===state.modelCrc?$('preset-name').value:null;snapshot=state;if(viewSlot!==state.active){viewSlot=state.active;retained=chainView.read(viewSlot);}effects=[...state.effects];fx=state.fx?[...state.fx]:null;if(selected>9&&!fx)selected=3;buffer=state.buffer;needsRefresh=false;live.reset(state);$('preset-name').value=name??editor.bank[state.active]?.name??COLORS[state.active]??'Preset';render();syncCapture();}
 function render(){
   pickVisible();
   const ready=online();
@@ -100,17 +102,17 @@ function render(){
     if(active)b.setAttribute('aria-current','true');b.append(el('span',undefined,'swatch'),el('span',index+1));item.append(b);return item;
   }));
   $('empty-chain').hidden=ready;$('chain').hidden=!ready;
-  $('chain-hint').textContent=ready?(compact()?`${shown().length} active ${shown().length===1?'block':'blocks'} · select to edit`:'Tap a symbol to bypass · select a name to edit'):'Waiting for connection';
+  $('chain-hint').textContent=ready?(compact()?`${shown().length} ${shown().length===1?'block':'blocks'} · select to edit`:'Tap a symbol to bypass · select a name to edit'):'Waiting for connection';
   renderChain();detail();status();diagnostics();
 }
 function renderChain(){
   const scroll=$('chain').scrollLeft;$('chain').replaceChildren();if(!online())return;
-  if(compact())$('chain-hint').textContent=`${shown().length} active ${shown().length===1?'block':'blocks'} · select to edit`;
+  if(compact())$('chain-hint').textContent=`${shown().length} ${shown().length===1?'block':'blocks'} · select to edit`;
   if(compact()&&!shown().length)$('chain').append(el('p','Direct signal · add a block to begin.','secondary'));
   for(const id of shown()){
     const [name,short,path]=blocks[id],bypassed=id>9?!fx[(id-11)*16+1]:Boolean(effects[id]&64);
     const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.draggable=true;
-    const power=button('',()=>toggleBlock(id),`${compact()?'Remove':bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
+    const power=button('',()=>toggleBlock(id),`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
     const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');const line=document.createElementNS(icon.namespaceURI,'path');line.setAttribute('d',path);icon.append(line);power.append(icon);
     const select=button('',()=>{selected=id;renderChain();detail();status();},`Edit ${name}`);select.className='block-select';select.setAttribute('aria-pressed',String(selected===id));select.append(el('span',short),el('small',bypassed?'Bypassed':'On'));
     block.addEventListener('dragstart',event=>{if(!canEdit()){event.preventDefault();return;}dragged=id;event.dataTransfer.setData('text/plain',String(id));});
@@ -125,11 +127,12 @@ function detail(){
   $('block-detail').hidden=online()&&compact()&&!selected;
   $('block-name').textContent=ready?blocks[selected][0]:'No block selected';
   const enabled=ready&&(selected>9?Boolean(fx[(selected-11)*16+1]):!(effects[selected]&64));
-  $('block-state').textContent=ready?(compact()?'Remove from chain':enabled?'Enabled':'Bypassed'):'—';
+  $('block-state').textContent=ready?(enabled?'Enabled':'Bypassed'):'—';
   $('block-state').setAttribute('aria-pressed',String(enabled));
-  $('block-state').setAttribute('aria-label',ready?compact()?`Remove ${blocks[selected][0]} from chain`:`${blocks[selected][0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
-  $('block-state').title=ready?`Tap to ${compact()?'remove':enabled?'bypass':'enable'} ${blocks[selected][0]}`:'';
+  $('block-state').setAttribute('aria-label',ready?`${blocks[selected][0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
+  $('block-state').title=ready?`Tap to ${enabled?'bypass':'enable'} ${blocks[selected][0]}`:'';
   $('block-info').textContent=!ready?'Your chain will appear here.':selected===3?(activeCapture?'48 kHz · A2 Lite':snapshot.loaded?'Onboard capture. Choose another from TONE3000 or your phone library.':'Choose a 48 kHz A2 Lite capture.'):selected===4&&choice?.id===4?'12 dB/oct · set either control to Off to use the other alone.':'';
+  $('remove-block').hidden=!ready||!compact();$('change-block').hidden=!ready||!compact();
   $('nam-controls').hidden=!ready||selected!==3;tones.showActive(activeCapture);
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
@@ -155,7 +158,7 @@ function detail(){
 }
 function toggleBlock(id){
   if(!canEdit())return;selected=id;
-  if(compact()){const changed=membership(effects,fx,id,false,snapshot.identity);fx=changed.fx;edit(next=>next.splice(0,128,...changed.effects));return;}
+  if(compact()){if(!retained.includes(id))retained.push(id);rememberView();}
   edit(next=>{if(id>9)fx[(id-11)*16+1]^=1;else next[id]^=64;});
 }
 function edit(change,redraw=true){
@@ -168,7 +171,7 @@ async function work(label,action){
   try{await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();}}
 }
-function clear(){tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}
+function clear(){tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}
 async function recall(slot){
   if(slot===snapshot?.active&&savedMatches())return;
   if(!savedMatches()&&!confirm('Switch preset and discard the unsaved changes?'))return;
@@ -191,18 +194,29 @@ function saveDestination(){const row=editor.bank[Number($('save-color').value)];
 $('save-color').addEventListener('change',saveDestination);$('close-save').addEventListener('click',()=>$('save-dialog').close());
 $('confirm-save').addEventListener('click',()=>{
   if(!canEdit()||locked()||!activeCapture)return;
-  const slot=Number($('save-color').value),model=activeCapture,name=$('preset-name').value;
+  const slot=Number($('save-color').value),model=activeCapture,name=$('preset-name').value,view=[...retained];
   try{nameBytes(name);}catch(e){message(e.message,true);return;}
-  $('save-dialog').close();work('Saving capture and chain…',async()=>{accept(await editor.saveCapture(snapshot,effects,buffer,name,slot,model,{playOnBoot}));message(`Saved capture and effects to ${COLORS[slot]}. Playback ${snapshot.listening?'on':'muted'}.`);});
+  $('save-dialog').close();work('Saving capture and chain…',async()=>{const saved=await editor.saveCapture(snapshot,effects,buffer,name,slot,model,{playOnBoot});chainView.write(slot,view);accept(saved);message(`Saved capture and effects to ${COLORS[slot]}. Playback ${snapshot.listening?'on':'muted'}.`);});
 });
-$('add-block').addEventListener('click',()=>{
+function chooseBlock(replacing=false){
   if(!canEdit()||!compact())return;
-  $('add-block-list').replaceChildren(...fullOrder(effects,fx).filter(id=>!enabled(effects,fx,id)).map(id=>button(blocks[id][0],()=>{
+  const previous=selected;
+  $('add-block-heading').textContent=replacing?'Change block':'Add block';
+  $('add-block-list').replaceChildren(...fullOrder(effects,fx).filter(id=>!shown().includes(id)).map(id=>button(blocks[id][0],()=>{
     if(!canEdit())return;
-    const changed=membership(effects,fx,id,true,snapshot.identity);fx=changed.fx;selected=id;
+    const changed=replacing?replaceBlock(effects,fx,previous,id,snapshot.identity):membership(effects,fx,id,true,snapshot.identity);
+    if(replacing)retained=retained.filter(x=>x!==previous);
+    if(!retained.includes(id))retained.push(id);rememberView();fx=changed.fx;selected=id;
     $('add-block-dialog').close();edit(next=>next.splice(0,128,...changed.effects));
   })));
+  if(!$('add-block-list').children.length)$('add-block-list').append(el('p','All available block types are already in this chain.','secondary'));
   $('add-block-dialog').showModal();
+}
+$('add-block').addEventListener('click',()=>chooseBlock());
+$('change-block').addEventListener('click',()=>chooseBlock(true));
+$('remove-block').addEventListener('click',()=>{
+  if(!canEdit()||!compact())return;
+  const changed=membership(effects,fx,selected,false,snapshot.identity);retained=retained.filter(id=>id!==selected);rememberView();fx=changed.fx;edit(next=>next.splice(0,128,...changed.effects));
 });
 $('close-add-block').addEventListener('click',()=>$('add-block-dialog').close());
 $('block-state').addEventListener('click',()=>toggleBlock(selected));

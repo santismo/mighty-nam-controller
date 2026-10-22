@@ -38,6 +38,12 @@ Loading a capture keeps the Captures browser open, preserving the current detail
 
 Protocol tests and browser checks use simulated BLE; they do not establish physical phone-transfer performance. No firmware or capture files are included here.
 
+## Bypass and changing blocks — controller 0.7.3
+
+On NAMLNK20/21, tapping a block symbol or Enabled/Bypassed badge toggles processing while keeping the tile. **Remove** is separate. **Change block** swaps it for an available block type at the same position, retaining its enabled/bypassed state. The effect chooser selects an effect within that block; FX A and FX B each offer Pitch, Auto Wah and modulation choices. Each stock engine is available once, plus the two flexible FX engines.
+
+Bypassed engines still do not run in the active DSP graph. Firmware stores their parameters and bypass state with Save. The choice to display a bypassed tile is remembered locally per color by this controller; it is not new firmware metadata shared between the phone and Mac. A newly connected controller always displays every enabled block.
+
 ## Playback — controller 0.7.1
 
 Master volume replaces the manual Listen/Mute controls. Capture loading and tuning still briefly stop output while their work completes, then resume the checked capture. Failed transfers and processing faults do not enable output. There is no startup-mute checkbox. The volume command was checked over USB on NAMLNK20; 108 controller tests pass. Bluetooth volume/tuner return on the physical iPhone still needs user confirmation.

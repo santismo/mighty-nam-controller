@@ -9,8 +9,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; connect-src 'self' https://www.tone3000.com https://api.tone3000.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>NAM Plug</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=0.7.2">
-  <script type="module" src="./src/app.js?v=0.7.2"></script>
+  <link rel="stylesheet" href="./style.css?v=0.7.3">
+  <script type="module" src="./src/app.js?v=0.7.3"></script>
 </head>
 <body>
   <div class="shell">
@@ -38,7 +38,7 @@
           <button type="button" id="block-state" class="tag block-toggle" aria-label="Selected block enabled" aria-pressed="false" disabled>—</button>
           <p id="block-info" class="secondary">Your chain will appear here.</p>
           <div id="nam-controls" class="nam-controls" hidden><div id="nam-capture"></div><div class="tone-actions"><button id="nam-browse" class="primary">Choose capture</button><button id="nam-favorite" class="secondary-button" hidden>☆ Favorite on phone</button></div></div>
-          <button id="choose-effect" class="effect-picker" hidden>Choose effect</button><div id="parameters" class="parameters"></div><div class="move-controls"><span class="secondary">Position</span><button id="move-left" aria-label="Move block left" disabled>←</button><button id="move-right" aria-label="Move block right" disabled>→</button></div>
+          <div class="move-controls"><button id="change-block" class="secondary-button" hidden>Change block</button><button id="remove-block" class="secondary-button" hidden>Remove</button></div><button id="choose-effect" class="effect-picker" hidden>Choose effect</button><div id="parameters" class="parameters"></div><div class="move-controls"><span class="secondary">Position</span><button id="move-left" aria-label="Move block left" disabled>←</button><button id="move-right" aria-label="Move block right" disabled>→</button></div>
         </section>
       </section>
       <section class="device-panel" aria-label="Plug status">
@@ -59,7 +59,7 @@
         <input id="tone-local-search" type="search" aria-label="Find a phone capture" placeholder="Find a phone capture"><p id="tone-message" class="message" role="status" aria-live="polite"></p><button id="tone-back" class="secondary-button" hidden>← Back to collection</button><div id="tone-content" class="tone-content"></div><button id="tone-more" class="secondary-button" hidden>More</button>
       </dialog>
       <dialog id="save-dialog"><div class="dialog-heading"><h2>Save capture to plug</h2><button id="close-save" class="secondary-button">Close</button></div><p class="secondary">Keeps this capture and effects after power-off. Saved presets play when powered on.</p><label for="save-color" class="eyebrow">Preset color</label><select id="save-color" aria-label="Save to preset color"></select><p id="save-destination" class="secondary"></p><button id="confirm-save" class="primary">Save to this color</button></dialog>
-      <dialog id="add-block-dialog"><div class="dialog-heading"><h2>Add block</h2><button id="close-add-block" class="secondary-button">Close</button></div><div id="add-block-list" class="effect-list"></div></dialog>
+      <dialog id="add-block-dialog"><div class="dialog-heading"><h2 id="add-block-heading">Add block</h2><button id="close-add-block" class="secondary-button">Close</button></div><div id="add-block-list" class="effect-list"></div></dialog>
       <dialog id="effect-dialog"><div class="dialog-heading"><h2 id="effect-heading">Choose effect</h2><button id="close-effects" class="secondary-button">Close</button></div><input id="effect-search" type="search" placeholder="Find an effect" aria-label="Find an effect"><div id="effect-list" class="effect-list"></div></dialog>
       <dialog id="tuner-dialog"><div class="dialog-heading"><h2>Tuner <span class="secondary">· Plug muted</span></h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
     </main>

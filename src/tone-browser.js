@@ -1,5 +1,5 @@
-import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.7.2';
-import { CaptureLibrary, parseModel } from './model.js?v=0.7.2';
+import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.7.3';
+import { CaptureLibrary, parseModel } from './model.js?v=0.7.3';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,fn,cls='secondary-button')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};

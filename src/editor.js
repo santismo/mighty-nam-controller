@@ -1,11 +1,11 @@
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.7.2';
-import { fxRequest, fxReply } from './fx.js?v=0.7.2';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.7.2';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.7.2';
-import { detectPitch, pitchReading } from './tuner.js?v=0.7.2';
-import { modelPacket,modelReply } from './model-wire.js?v=0.7.2';
-import { validateModel,includesCab } from './model.js?v=0.7.2';
-import { put,crc32,nameBytes } from './commands.js?v=0.7.2';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.7.3';
+import { fxRequest, fxReply } from './fx.js?v=0.7.3';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.7.3';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.7.3';
+import { detectPitch, pitchReading } from './tuner.js?v=0.7.3';
+import { modelPacket,modelReply } from './model-wire.js?v=0.7.3';
+import { validateModel,includesCab } from './model.js?v=0.7.3';
+import { put,crc32,nameBytes } from './commands.js?v=0.7.3';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
