@@ -1,14 +1,14 @@
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.8.2';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.8.2';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.8.2';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.8.2';
-import { PlugConnection } from './device.js?v=0.8.2';
-import { PlugEditor } from './editor.js?v=0.8.2';
-import { LiveEdits } from './live.js?v=0.8.2';
-import { AutoTuner } from './auto-tuner.js?v=0.8.2';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.8.2';
-import { nameBytes } from './commands.js?v=0.8.2';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.8.2';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.8.3';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.8.3';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.8.3';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.8.3';
+import { PlugConnection } from './device.js?v=0.8.3';
+import { PlugEditor } from './editor.js?v=0.8.3';
+import { LiveEdits } from './live.js?v=0.8.3';
+import { AutoTuner } from './auto-tuner.js?v=0.8.3';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.8.3';
+import { nameBytes } from './commands.js?v=0.8.3';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.8.3';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -71,20 +71,20 @@ function status(){
   $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
   $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
-  $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
+  $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22','NAMLNK23'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
   $('master-volume').disabled=!canEdit();$('master-volume').value=effects?.[84]??0;$('master-value').textContent=effects?`${effects[84]} %`:'—';
   $('buffer').disabled=!canEdit();$('buffer').value=String(buffer);
   const saved=editor.bank[snapshot?.active];
   $('buffer-state').textContent=!ready?'8 samples is the minimum output buffer.':live.pending?`Applying · last confirmed ${snapshot.buffer} samples`:snapshot.bufferStorageError?'Global buffer storage needs attention. Refresh the plug.':snapshot.globalBuffer?`Global · ${snapshot.buffer} samples · saved for every color`:`${snapshot.buffer} samples · this preset (global control needs NAMLNK18)`;
   const delayed=fx?[0,16].filter(i=>fx[i+1]&&fx[i+4]>0&&([3,4,7].includes(fx[i])||(fx[i]===1&&fx[i+3]!==12))).map(i=>`${i?'FX B':'FX A'} ${FX_MODES[fx[i]-1]}`):[];
   $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:snapshot?.globalBuffer?'One buffer setting applies to all colors, including after power-off.':'8 samples keeps the minimum output path. Global buffer requires NAMLNK18.';
-  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(snapshot?.identity));
+  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(snapshot?.identity));
   $('feature-notice').hidden=!ready||!editor.bankWarning;
   $('feature-notice').textContent=editor.bankWarning;
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.8.2 · ${snapshot.identity}`:'0.8.2';
+  $('version').textContent=ready?`0.8.3 · ${snapshot.identity}`:'0.8.3';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -140,7 +140,7 @@ function detail(){
   $('nam-controls').hidden=!ready||selected!==3;tones.showActive(activeCapture);
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
-  if(ready&&selected===3&&['NAMLNK21','NAMLNK22'].includes(snapshot.identity))for(const p of namParameters){
+  if(ready&&selected===3&&['NAMLNK21','NAMLNK22','NAMLNK23'].includes(snapshot.identity))for(const p of namParameters){
     const config=readNam(effects),label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output',p.label(config[p.index])),control=el('input');
     heading.append(value);control.type='range';control.min=0;control.max=p.max;control.step=1;control.value=config[p.index];control.setAttribute('aria-label',p.name);
     control.addEventListener('input',()=>{value.textContent=p.label(Number(control.value));edit(next=>{const c=readNam(next);c[p.index]=Number(control.value);putNam(next,c);},false);});label.append(heading,control);$('parameters').append(label);
@@ -289,7 +289,7 @@ async function selectCapture(model){
 }
 async function transferCapture(model){
   const ticket=++loadTicket;
-  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
+  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
   const state=await editor.loadModel(snapshot,model,{canceled:()=>ticket!==loadTicket,progress:(n,total)=>{const text=`Loading ${captureName(model)} · ${Math.round(n/total*100)}%`;message(text);tones.say(text);}});
   activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();tones.say(`${captureName(model)} is active. Keep browsing to try another capture.`);message(`${captureName(model)} loaded`);
 }

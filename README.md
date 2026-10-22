@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.2) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.3) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -29,7 +29,7 @@ The integration uses OAuth picker flows and bounded favorites/downloaded/created
 
 ## Compatibility and status
 
-Controller **0.8.2** updates the project name, Pages address, notices and documentation. NAMLNK22 support was added in 0.8.1. NAMLNK22 is an experimental pitch-quality candidate: offline DSP, two-FX/NAM/reverb, persistence and controller tests pass; hardware pitch timing/listening and Logic duplex remain unverified. Updating this page does not install firmware or change DSP sound.
+Controller **0.8.3** adds NAMLNK23 support for the experimental public V3.0.5 Original firmware port. Capture transfers, both FX blocks, NAM controls, USB recording gain, tuner, presets and global 8/16/32-sample buffering pass offline controller tests. Connection/status reads do not change plug playback. Physical NAMLNK23 validation remains pending; updating this page does not install firmware or change DSP sound.
 
 | Firmware | Available features |
 | --- | --- |

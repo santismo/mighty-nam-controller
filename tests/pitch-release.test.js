@@ -8,8 +8,8 @@ import {putNam as putRecord,readNam as readRecord} from '../src/usb-record.js';
 import {allowedCommand} from '../src/commands.js';
 import {supportsActiveChain,visibleOrder} from '../src/active-chain.js';
 
-test('NAMLNK22 pitch, NAM, USB gain, global buffer and color recall remain editable',async()=>{
- const fake=editingBluetooth({identity:'NAMLNK22'}),link=new PlugConnection(fake.bluetooth,500,0,0),editor=new PlugEditor(link);
+for(const identity of ['NAMLNK22','NAMLNK23']) test(`${identity} pitch, NAM, USB gain, global buffer and color recall remain editable`,async()=>{
+ const fake=editingBluetooth({identity}),link=new PlugConnection(fake.bluetooth,500,0,0),editor=new PlugEditor(link);
  fake.words[23]=1;
  await link.connect();await editor.readBank();let state=link.current;
  assert.equal(supportsActiveChain(state.identity),true);
@@ -25,6 +25,6 @@ test('NAMLNK22 pitch, NAM, USB gain, global buffer and color recall remain edita
  assert.equal(state.active,0);assert.equal(state.buffer,16);assert.deepEqual(state.fx,fx);
  assert.equal(fake.requests.some(q=>q[7]===65),false,'Unexpected listen/mute command');
  const q=namRequest(1,0,123,[48,12,12,12,100,48],state.modelCrc);
- assert.equal(allowedCommand(q,true,{...state,identity:'NAMLNK23'}),false);
+ assert.equal(allowedCommand(q,true,{...state,identity:'NAMLNK24'}),false);
  link.close();
 });
