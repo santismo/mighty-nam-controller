@@ -1,5 +1,5 @@
-import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.7.1';
-import { CaptureLibrary, parseModel } from './model.js?v=0.7.1';
+import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.7.2';
+import { CaptureLibrary, parseModel } from './model.js?v=0.7.2';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,fn,cls='secondary-button')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};
@@ -54,6 +54,7 @@ export class ToneBrowser {
       const wrap=node('div',undefined,'tone-row');wrap.append(captureCard(row.metadata?.tone,row.metadata?.model?.name));
       const actions=node('div',undefined,'tone-actions');const active=this.active?.sha===row.sha;
       const load=button(active?'Active on plug':'Load capture',()=>this.job('Reading downloaded capture…',async()=>{await this.select(await this.library.get(row.sha));}),active?'secondary-button':'primary');
+      load.dataset.captureSha=row.sha;
       const fav=button(row.favorite?'★ Favorite':'☆ Favorite',()=>this.favorite(row));fav.setAttribute('aria-pressed',String(row.favorite));
       const remove=button('Remove',()=>{if(confirm('Remove this download from this phone? Saved plug presets are kept.')){this.library.remove(row.sha);this.onChange();this.list();}});
       actions.append(load,fav,remove);wrap.append(actions);return wrap;
@@ -88,12 +89,17 @@ export class ToneBrowser {
         const meta={id:model.id,tone_id:model.tone_id,name:model.name,size:model.size,architecture_version:model.architecture_version};
         const t=this.tone,tone={id:t.id,title:t.title,description:(t.description||'').slice(0,8000),gear:t.gear,format:t.format,license:t.license,images:(t.images||[]).slice(0,1),user:t.user,url:t.url,downloads_count:t.downloads_count};
         const capture=await parseModel(bytes,{tone,model:meta});await this.library.add(capture);await this.select(capture);
-      }),supported?'primary':'secondary-button');b.dataset.unavailable=String(!supported);b.disabled=!supported;wrap.append(b);return wrap;
+      }),supported?'primary':'secondary-button');b.dataset.unavailable=String(!supported);b.disabled=!supported;b.dataset.modelId=model.id;wrap.append(b);return wrap;
     });if(append)this.modelList.append(...rows);else this.modelList.replaceChildren(...rows);
     this.say(result.data.length?'A2 Lite is extracted automatically from compatible A2 captures.':'This tone has no A2 models. Browse another capture.');
     $('tone-more').hidden=!(this.modelPage<Math.min(result.total_pages||1,100));$('tone-more').onclick=()=>this.job('Reading more models…',async()=>{this.modelPage++;await this.models(true);});
   }
-  async select(model){await this.onSelect(model);this.onChange();}
+  async select(model){await this.onSelect(model);this.onChange();
+    if(this.active?.sha===model.sha){
+      for(const b of $('tone-content').querySelectorAll('button[data-model-id]'))if(b.dataset.unavailable!=='true')b.textContent=Number(b.dataset.modelId)===model.metadata?.model?.id?'Active on plug':'Load capture';
+      for(const b of $('tone-content').querySelectorAll('button[data-capture-sha]'))b.textContent=b.dataset.captureSha===model.sha?'Active on plug':'Load capture';
+    }
+  }
   favorite(model){if(!model||this.isBusy())return;try{const row=this.library.records().find(r=>r.sha===model.sha);this.library.favorite(model.sha,!row?.favorite);this.onChange();this.showActive(this.active);if(['local','favorites'].includes(this.view))this.local();}catch(e){this.say(e.message,true);}}
   showActive(model){this.active=model;$('nam-capture').replaceChildren();if(model)$('nam-capture').append(captureCard(model.metadata?.tone,model.metadata?.model?.name));const row=model&&this.library.records().find(r=>r.sha===model.sha);$('nam-favorite').hidden=!row;$('nam-favorite').textContent=row?.favorite?'★ Favorite on phone':'☆ Favorite on phone';$('nam-favorite').setAttribute('aria-pressed',String(Boolean(row?.favorite)));}
 }

@@ -30,6 +30,14 @@ Up to 64 selected downloads are kept in this browser's local storage. Clearing b
 
 Model transfers support NAMLNK14 through NAMLNK17. FX A/B support NAMLNK13–17; updating the page alone cannot add them to older firmware. Mac app 0.3.9 also includes both extra FX editors.
 
+## NAM controls and browsing — controller 0.7.2
+
+On NAMLNK21, select NAM to adjust input/output gain (−24 to +24 dB), bass/middle/treble (−12 to +12 dB), and wet/dry mix. Changes apply live with confirmed readback; Save to plug keeps them with the color. Older firmware keeps its existing controls. NAMLNK21 is staged and offline-tested, not yet installed or verified with physical USB audio.
+
+Loading a capture keeps the Captures browser open, preserving the current details, filters and scroll position. The selected model is marked active after the plug confirms it. Keep browsing to try another capture, or close the browser when finished. Offline downloads also keep the browser open; close it and connect to send the queued capture. The official TONE3000 sign-in/picker still returns to this controller page as before.
+
+Protocol tests and browser checks use simulated BLE; they do not establish physical phone-transfer performance. No firmware or capture files are included here.
+
 ## Playback — controller 0.7.1
 
 Master volume replaces the manual Listen/Mute controls. Capture loading and tuning still briefly stop output while their work completes, then resume the checked capture. Failed transfers and processing faults do not enable output. There is no startup-mute checkbox. The volume command was checked over USB on NAMLNK20; 108 controller tests pass. Bluetooth volume/tuner return on the physical iPhone still needs user confirmation.

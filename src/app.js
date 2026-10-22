@@ -1,12 +1,13 @@
-import { supportsActiveChain, visibleOrder, membership, enabled } from './active-chain.js?v=0.7.1';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.7.1';
-import { PlugConnection } from './device.js?v=0.7.1';
-import { PlugEditor } from './editor.js?v=0.7.1';
-import { LiveEdits } from './live.js?v=0.7.1';
-import { AutoTuner } from './auto-tuner.js?v=0.7.1';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.7.1';
-import { nameBytes } from './commands.js?v=0.7.1';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.7.1';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.7.2';
+import { supportsActiveChain, visibleOrder, membership, enabled } from './active-chain.js?v=0.7.2';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.7.2';
+import { PlugConnection } from './device.js?v=0.7.2';
+import { PlugEditor } from './editor.js?v=0.7.2';
+import { LiveEdits } from './live.js?v=0.7.2';
+import { AutoTuner } from './auto-tuner.js?v=0.7.2';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.7.2';
+import { nameBytes } from './commands.js?v=0.7.2';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.7.2';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const blocks={
@@ -72,13 +73,13 @@ function status(){
   $('buffer-state').textContent=!ready?'8 samples is the minimum output buffer.':live.pending?`Applying · last confirmed ${snapshot.buffer} samples`:snapshot.bufferStorageError?'Global buffer storage needs attention. Refresh the plug.':snapshot.globalBuffer?`Global · ${snapshot.buffer} samples · saved for every color`:`${snapshot.buffer} samples · this preset (global control needs NAMLNK18)`;
   const delayed=fx?[0,16].filter(i=>fx[i+1]&&fx[i+4]>0&&([3,4,7].includes(fx[i])||(fx[i]===1&&fx[i+3]!==12))).map(i=>`${i?'FX B':'FX A'} ${FX_MODES[fx[i]-1]}`):[];
   $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:snapshot?.globalBuffer?'One buffer setting applies to all colors, including after power-off.':'8 samples keeps the minimum output path. Global buffer requires NAMLNK18.';
-  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20'].includes(snapshot?.identity));
+  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(snapshot?.identity));
   $('feature-notice').hidden=!ready||!editor.bankWarning;
   $('feature-notice').textContent=editor.bankWarning;
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.7.1 · ${snapshot.identity}`:'0.7.1';
+  $('version').textContent=ready?`0.7.2 · ${snapshot.identity}`:'0.7.2';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -132,6 +133,11 @@ function detail(){
   $('nam-controls').hidden=!ready||selected!==3;tones.showActive(activeCapture);
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
+  if(ready&&selected===3&&snapshot.identity==='NAMLNK21')for(const p of namParameters){
+    const config=readNam(effects),label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output',p.label(config[p.index])),control=el('input');
+    heading.append(value);control.type='range';control.min=0;control.max=p.max;control.step=1;control.value=config[p.index];control.setAttribute('aria-label',p.name);
+    control.addEventListener('input',()=>{value.textContent=p.label(Number(control.value));edit(next=>{const c=readNam(next);c[p.index]=Number(control.value);putNam(next,c);},false);});label.append(heading,control);$('parameters').append(label);
+  }
   if(ready&&selected>9)for(const p of fxControls(fx,selected-11)){
     const label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output'),control=el('input');
     const format=p.label??(v=>`${v} %`);value.textContent=format(fx[p.index]);heading.append(value);
@@ -256,7 +262,7 @@ function showQueued(){
 async function selectCapture(model){
   if(locked())throw new Error('Wait for the plug to finish its current operation.');
   queuedCapture=model;showQueued();
-  if(!connection.connected){$('tone-dialog').close();message('Capture ready. Tap Connect to load it onto the plug.');return;}
+  if(!connection.connected){tones.say('Downloaded. Close Captures and tap Connect to load it onto the plug.');message('Capture ready. Tap Connect to load it onto the plug.');return;}
   if(needsRefresh)throw new Error('Capture downloaded. Refresh the plug before loading it.');
   let loaded=false;
   await work('Loading capture onto plug…',async()=>{await transferCapture(model);loaded=true;});
@@ -264,9 +270,9 @@ async function selectCapture(model){
 }
 async function transferCapture(model){
   const ticket=++loadTicket;
-  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
+  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
   const state=await editor.loadModel(snapshot,model,{canceled:()=>ticket!==loadTicket,progress:(n,total)=>{const text=`Loading ${captureName(model)} · ${Math.round(n/total*100)}%`;message(text);tones.say(text);}});
-  activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();$('tone-dialog').close();message(`${captureName(model)} is active. Playback ${state.listening?'on':'muted'}; Save to plug keeps it after power-off.`);
+  activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();tones.say(`${captureName(model)} is active. Keep browsing to try another capture.`);message(`${captureName(model)} is active. Playback ${state.listening?'on':'muted'}; Save to plug keeps it after power-off.`);
 }
 $('cancel-capture').addEventListener('click',()=>{loadTicket++;queuedCapture=null;showQueued();message('Capture load canceled. The download is kept on this phone.');});
 window.addEventListener('pagehide',clear);$('browser-help').hidden=Boolean(navigator.bluetooth?.requestDevice);render();
