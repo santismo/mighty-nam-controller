@@ -1,4 +1,4 @@
-import { fullOrder, reorder } from './fx.js?v=0.7.0';
+import { fullOrder, reorder } from './fx.js?v=0.7.1';
 export const supportsActiveChain = identity => identity === 'NAMLNK20';
 export const enabled = (effects, fx, id) => id > 9 ? Boolean(fx?.[(id-11)*16+1]) : !(effects[id]&64);
 export function visibleOrder(effects, fx, identity) {

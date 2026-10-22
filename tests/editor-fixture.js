@@ -88,7 +88,7 @@ export function editingBluetooth(options={}){
     methods.push(method);writeCount++;if(options.rejectMutation&&new Uint8Array(data)[2]===176)throw new Error('Request rejected');
     if(options.delay)await new Promise(r=>setTimeout(r,options.delay));
     const packet=[...new Uint8Array(data)];writes.push(packet);
-    if(packet[2]===176){const cc=packet[3],value=packet[4];requests.push(packet.slice(2));if(!options.ignoreCC){if(cc<=9)effects[cc]=value;else{const r=ranges.find(([a,b])=>cc>=a&&cc<=b);effects[r[2]+cc-r[0]]=value;}}options.onCC?.(cc,value);}
+    if(packet[2]===176){const cc=packet[3],value=packet[4];requests.push(packet.slice(2));if(!options.ignoreCC){if(cc<=9)effects[cc]=value;else if(cc===73)effects[84]=value;else{const r=ranges.find(([a,b])=>cc>=a&&cc<=b);effects[r[2]+cc-r[0]]=value;}}options.onCC?.(cc,value);}
     else decoder.push(Uint8Array.from(packet));
   };
   characteristic.writeValueWithoutResponse=d=>write('without',d);characteristic.writeValueWithResponse=d=>write('with',d);

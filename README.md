@@ -1,6 +1,6 @@
 # NAM Plug controller
 
-[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.7.0)
+[Open controller](https://santismo.github.io/nam-plug-controller/?v=0.7.1)
 
 A Bluetooth controller for NAM Plug. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**.
 
@@ -10,9 +10,9 @@ A Bluetooth controller for NAM Plug. On iPhone, open the page in [Bluefy](https:
 - Pitch moves in semitone steps from **−12 to +12**. The first implementation is intended for single notes. Its additional processing delay is separate from the output buffer; chord quality and hardware headroom are still experimental.
 - On **NAMLNK14–16**, choose **Equalizer → High / Low Cut**. Low Cut covers 20 Hz–1 kHz; High Cut covers 1–20 kHz. Both are 12 dB/oct filters, each with an **Off** position. The EQ block can move and save with the preset. This new choice is hidden on older firmware.
 - Controls apply live. Rapid slider movements are combined, and final settings are read back. They are **not saved automatically**.
-- **Save to plug** keeps the preset name, effects, order, NAM capture, and both FX blocks after power-off. A phone-loaded capture can be saved to any of the seven colors, including an empty slot. The dialog identifies an occupied destination before replacing it. **Play when powered on** defaults on for saves, including older presets saved muted during testing. The page shows the actual saved startup setting separately; tap Save to plug once for each color to change it. Successful saves preserve whether output was on or muted. Switching presets discards unsaved edits.
+- **Save to plug** keeps the preset name, effects, order, NAM capture, and both FX blocks after power-off. A phone-loaded capture can be saved to any of the seven colors, including an empty slot. The dialog identifies an occupied destination before replacing it. Saved presets play when powered on. **Master volume** applies live and is kept with that color when saved. Switching presets discards unsaved edits.
 - Choose an **8, 16, or 32 sample** output buffer. The page shows the confirmed device value. With NAMLNK18, it is saved globally for all colors; older firmware retains per-preset settings. Playback resumes after a successful change if it was on beforehand. Eight retains the existing minimum output path. Pitch, chorus, flanger and vibrato can add effect delay regardless of this setting.
-- **Tuner** starts reading automatically. Pluck one string and let it ring. Clear guitar notes use a shorter snapshot; low or uncertain notes use more samples. Bluetooth updates take time and are not an audio stream. Closing the tuner or hiding the page stops polling; closing leaves the plug muted. It never accesses the phone or Mac microphone.
+- **Tuner** starts reading automatically. Pluck one string and let it ring. Clear guitar notes use a shorter snapshot; low or uncertain notes use more samples. Bluetooth updates take time and are not an audio stream. Closing the tuner or hiding the page stops polling; closing resumes playback after checking the current capture and preset. It never accesses the phone or Mac microphone.
 
 Use one controller at a time. After changing presets with the plug's button, tap **Refresh**. A failed edit stops automatic writes until a fresh read. The page never retries a save automatically. Keep the page open and connected while saving.
 
@@ -21,7 +21,7 @@ Use one controller at a time. After changing presets with the plug's button, tap
 1. Open **Captures** (or **NAM → Choose capture**) and choose **Browse TONE3000**. Sign in there, browse/filter/search, open a tone and tap **Select Tone** to return.
 2. Tap **Load capture** on a model. The controller extracts and validates the compatible **48 kHz A2 Lite** model, including Lite inside an A2 container. A1, other topologies and other sample rates cannot run on this firmware.
 3. Returning from the catalog disconnects Bluetooth. Tap **Connect** to send the selected download to the plug in normal mode. Keep the page open during transfer. No Mac, proxy, private API key, paid plan or firmware update is required on **NAMLNK14–16**.
-4. After checksum/readback confirmation the selected capture becomes the active NAM model. The plug stays muted. Amp + cabinet captures automatically bypass the stock cabinet. Tap **Listen on plug** when ready, with headphone volume low.
+4. After checksum/readback confirmation the selected capture becomes the active NAM model. Playback resumes automatically after validation. Amp + cabinet captures automatically bypass the stock cabinet. Keep headphone volume low when trying an unfamiliar capture.
 5. **☆ Favorite** keeps multiple favorites on this phone. **Save to plug** is separate: choose a color to keep the capture and chain after power-off.
 
 The browser offers TONE3000 account favorites, downloaded/created tones and bounded trending/latest feeds. Full catalog search uses the official picker, in accordance with [TONE3000's API terms](https://www.tone3000.com/api/terms). Phone favorites are local and do not alter your TONE3000 favorites. Tap More to request another page; there is no catalog mirroring or bulk downloading.
@@ -29,6 +29,10 @@ The browser offers TONE3000 account favorites, downloaded/created tones and boun
 Up to 64 selected downloads are kept in this browser's local storage. Clearing browser data removes that phone library, but not onboard presets. The saved capture retains creator/license information; the repository includes no captures. Access/refresh tokens stay in memory, so reloading the page requires using Browse TONE3000 again. The short-lived PKCE verifier is stored only until return. Sign-in uses the project's public client ID; no private API key is embedded. An interrupted Bluetooth upload is aborted only for the exact prior session belonging to this browser/device pair, then restarted on an explicit new load. Preset saves are never retried automatically.
 
 Model transfers support NAMLNK14 through NAMLNK17. FX A/B support NAMLNK13–17; updating the page alone cannot add them to older firmware. Mac app 0.3.9 also includes both extra FX editors.
+
+## Playback — controller 0.7.1
+
+Master volume replaces the manual Listen/Mute controls. Capture loading and tuning still briefly stop output while their work completes, then resume the checked capture. Failed transfers and processing faults do not enable output. There is no startup-mute checkbox. The volume command was checked over USB on NAMLNK20; 108 controller tests pass. Bluetooth volume/tuner return on the physical iPhone still needs user confirmation.
 
 ## Active chains — controller 0.7.0
 

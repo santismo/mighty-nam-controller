@@ -1,10 +1,10 @@
-import { fxRequest, fxReply } from './fx.js?v=0.7.0';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.7.0';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.7.0';
-import { detectPitch, pitchReading } from './tuner.js?v=0.7.0';
-import { modelPacket,modelReply } from './model-wire.js?v=0.7.0';
-import { validateModel,includesCab } from './model.js?v=0.7.0';
-import { put,crc32,nameBytes } from './commands.js?v=0.7.0';
+import { fxRequest, fxReply } from './fx.js?v=0.7.1';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.7.1';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.7.1';
+import { detectPitch, pitchReading } from './tuner.js?v=0.7.1';
+import { modelPacket,modelReply } from './model-wire.js?v=0.7.1';
+import { validateModel,includesCab } from './model.js?v=0.7.1';
+import { put,crc32,nameBytes } from './commands.js?v=0.7.1';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -176,7 +176,7 @@ export class PlugEditor {
       if(state.active!==expected.active||state.modelCrc!==model.crc||state.listening||state.faults||!state.running||!same(state.effects,expected.effects)||!same(state.fx,expected.fx))throw new Error('The loaded capture was not confirmed. Refresh the plug.');
       const effects=[...state.effects];effects[3]&=63;if(includesCab(model))effects[9]|=64;
       state=await this.applyInternal(state,effects,state.buffer);this.activeCapture=model;
-      state=await this.preserveOutput(state,before.listening);this.link.progress('Capture loaded');return state;
+      state=await this.preserveOutput(state,true);this.link.progress('Capture loaded');return state;
     }catch(error){
       if(epoch===this.link.epoch&&this.link.connected&&!this.link.writeStalled){
         if(began&&!committed)try{await exchange(5);this.clearTransfer();}catch{}
@@ -198,6 +198,7 @@ export class PlugEditor {
     if(saved.generation!==checked.generation||checked.generation<before.generation||after.faults||!after.running||after.modelCrc!==model.crc||after.active!==slot||!same(after.effects,effects)||!same(after.fx,state.fx))throw new Error('Saved capture was not fully confirmed. Refresh before saving again.');
     return this.preserveOutput(after,state.listening);
   });}
+  resume(expected){return this.run(async()=>this.preserveOutput(await this.current(expected),true));}
   listen(enabled){return this.run(async()=>{
     const state=await this.link.snapshot();if(enabled&&(!state.running||state.faults||!state.loaded))throw new Error('Load a healthy onboard preset before listening.');
     await this.send(listenCommand(enabled),enabled?'Enabling plug output':'Muting plug');
