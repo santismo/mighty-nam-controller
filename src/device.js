@@ -1,10 +1,10 @@
-import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.8.1';
-import { fxRequest, fxReply } from './fx.js?v=0.8.1';
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.8.1';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.8.2';
+import { fxRequest, fxReply } from './fx.js?v=0.8.2';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.8.2';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.8.1';
-import { allowedCommand } from './commands.js?v=0.8.1';
-import { validateEffects } from './controls.js?v=0.8.1';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.8.2';
+import { allowedCommand } from './commands.js?v=0.8.2';
+import { validateEffects } from './controls.js?v=0.8.2';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -39,7 +39,7 @@ export class PlugConnection extends EventTarget {
     const s=this.current;
     const summary=s?`Firmware: ${s.identity}\nConfirmed buffer: ${s.buffer} samples at ${s.sampleRate} Hz\nBuffer scope: ${s.globalBuffer?'Global · saved on plug':'Per preset'}${s.bufferStorageError?' · storage error':''}\nActive color index: ${s.active}; capture CRC: ${s.modelCrc}; faults: ${s.faults}\nOutput: ${s.listening?'on':'muted'}; settling: ${s.settling}\nLive stock effects: ${s.effects.join(',')}\nLive FX A/B: ${s.fx?.join(',')??'unavailable'}\n`:'';
     const codec=s?.codec?`Converter startup: ${s.codec.verified?'short-delay setting verified':'setting unverified'}; ${s.codec.raw.toString(16)}\n`:'';
-    return `mighty-nam controller 0.8.1\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `mighty-nam controller 0.8.2\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async connect() {

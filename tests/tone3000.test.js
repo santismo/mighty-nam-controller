@@ -4,7 +4,7 @@ import { ToneClient,TONE_ORIGIN,safeImage,toneURL } from '../src/tone3000.js';
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k),data};};
 const response=(object,status=200)=>new Response(JSON.stringify(object),{status,headers:{'content-type':'application/json'}});
 const session={access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer'};
-const redirect='https://santismo.github.io/nam-plug-controller/';
+const redirect='https://santismo.github.io/mighty-nam-controller/';
 async function flow(client){const url=new URL(await client.authorize(redirect));return `${redirect}?state=${url.searchParams.get('state')}&code=test-code&tone_id=123`;}
 test('PKCE authorization, one-use callback and token exchange keep credentials out of persistent storage',async()=>{
   const store=storage(),calls=[],client=new ToneClient({storage:store,fetcher:async(u,o)=>{calls.push([u,o]);return response(session);}});

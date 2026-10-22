@@ -9,8 +9,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; connect-src 'self' https://www.tone3000.com https://api.tone3000.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>mighty-nam</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=0.8.1">
-  <script type="module" src="./src/app.js?v=0.8.1"></script>
+  <link rel="stylesheet" href="./style.css?v=0.8.2">
+  <script type="module" src="./src/app.js?v=0.8.2"></script>
 </head>
 <body>
   <div class="shell">
@@ -54,7 +54,7 @@
         <p id="copy-status" role="status"></p>
       </details>
       <section id="queued-capture" class="queued-capture" hidden><div><span class="eyebrow">Ready to load</span><strong id="queued-name"></strong><p class="secondary">Connect the plug to load this capture. Saved presets stay unchanged.</p></div><button id="cancel-capture" class="secondary-button">Cancel</button></section>
-      <dialog id="tone-dialog" class="tone-dialog"><div class="dialog-heading"><div><h2>Captures</h2><a class="tone-credit" href="https://www.tone3000.com" target="_blank" rel="noopener noreferrer">Powered by TONE3000 ↗</a></div><button id="close-tones" class="secondary-button">Close</button></div>
+      <dialog id="tone-dialog" class="tone-dialog"><div class="dialog-heading"><div><h2>Captures</h2><a class="tone-credit" href="https://www.tone3000.com" target="_blank" rel="noopener noreferrer"><span>Powered by</span> <img src="assets/tone3000.svg" alt="TONE3000" width="100" height="23" style="vertical-align:middle"> ↗</a></div><button id="close-tones" class="secondary-button">Close</button></div>
         <div class="tone-toolbar"><button id="tone-catalog" class="primary">Browse TONE3000 ↗</button><span id="tone-account"></span><button id="tone-signout" class="secondary-button" hidden>Sign out</button></div>
         <div class="tone-filters"><select id="tone-collection" aria-label="Capture collection"><option value="local">On this phone</option><option value="favorites">Phone favorites</option><option value="favorited">TONE3000 favorites</option><option value="downloaded">TONE3000 downloads</option><option value="created">My TONE3000 captures</option><option value="trending">Trending</option><option value="latest">Latest</option></select><select id="tone-gear" aria-label="Gear type"><option value="">All gear</option><option value="amp-cab">Amp + cabinet</option><option value="amp">Amp head</option><option value="pedal">Pedal</option><option value="cab">Cabinet</option><option value="outboard">Outboard</option></select></div>
         <input id="tone-local-search" type="search" aria-label="Find a phone capture" placeholder="Find a phone capture"><p id="tone-message" class="message" role="status" aria-live="polite"></p><button id="tone-back" class="secondary-button" hidden>← Back to collection</button><div id="tone-content" class="tone-content"></div><button id="tone-more" class="secondary-button" hidden>More</button>
@@ -64,7 +64,8 @@
       <dialog id="effect-dialog"><div class="dialog-heading"><h2 id="effect-heading">Choose effect</h2><button id="close-effects" class="secondary-button">Close</button></div><input id="effect-search" type="search" placeholder="Find an effect" aria-label="Find an effect"><div id="effect-list" class="effect-list"></div></dialog>
       <dialog id="tuner-dialog"><div class="dialog-heading"><h2>Tuner</h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
     </main>
-    <footer><span id="version">0.8.1</span><a href="https://github.com/santismo/nam-plug-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
+  <footer style="text-align:center;padding:20px;color:#8c929c;font-size:12px"><a href="https://santismo.github.io/mighty-nam/phone.html">Guide</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/LEGAL.md">Legal</a></footer>
+    <footer><span id="version">0.8.2</span><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
     <noscript>Enable JavaScript to connect.</noscript>
   </div>
 </body>

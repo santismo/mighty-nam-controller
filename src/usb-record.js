@@ -1,4 +1,4 @@
-import {readNam as readTone} from './nam-controls.js?v=0.8.1';
+import {readNam as readTone} from './nam-controls.js?v=0.8.2';
 const PREFIX=[240,67,88,112,4,2,78,86,1];
 const same=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
 export const neutralNam=()=>[48];
