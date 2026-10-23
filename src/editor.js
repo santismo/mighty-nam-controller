@@ -1,12 +1,12 @@
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.8.3';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.8.3';
-import { fxRequest, fxReply } from './fx.js?v=0.8.3';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.8.3';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.8.3';
-import { detectPitch, pitchReading } from './tuner.js?v=0.8.3';
-import { modelPacket,modelReply } from './model-wire.js?v=0.8.3';
-import { validateModel,includesCab } from './model.js?v=0.8.3';
-import { put,crc32,nameBytes } from './commands.js?v=0.8.3';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.8.4';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.8.4';
+import { fxRequest, fxReply } from './fx.js?v=0.8.4';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.8.4';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.8.4';
+import { detectPitch, pitchReading } from './tuner.js?v=0.8.4';
+import { modelPacket,modelReply } from './model-wire.js?v=0.8.4';
+import { validateModel,includesCab } from './model.js?v=0.8.4';
+import { put,crc32,nameBytes } from './commands.js?v=0.8.4';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -25,7 +25,7 @@ export class PlugEditor {
     if(op!==1)this.requireLargeReplies();
     const wire=presetRequest(op,slot,this.token(),body);
     const result=await this.link.request(wire,m=>{
-      const parsed=presetReply(m,wire);
+      const parsed=presetReply(m,wire,this.link.current?.identity);
       if(parsed!==null)return parsed;
       // NAMLNK12 can emit a 75-byte Bluetooth reply containing only the
       // first five bytes and the tail (offset 256) of the 326-byte reply.
@@ -39,7 +39,7 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
-    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
+    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }
   async fx(op,slot,config=null,model=0){
@@ -48,13 +48,13 @@ export class PlugEditor {
     if(result.error)throw new Error('FX settings were rejected. Refresh the plug.');return result;
   }
   async nam(state,effects){
-    if(!['NAMLNK21','NAMLNK22','NAMLNK23'].includes(state.identity))throw new Error('NAM controls require NAMLNK21.');
+    if(!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(state.identity))throw new Error('NAM controls require NAMLNK21.');
     const config=readNam(effects),q=namRequest(1,state.active,this.token()%16383+1,config,state.modelCrc);
     const reply=await this.link.request(q,m=>namReply(m,q),'Applying NAM controls',{mutation:true});
     if(reply.error||reply.active!==state.active||!same(reply.config,config))throw new Error('NAM controls were not confirmed. Refresh the plug.');
   }
   async recording(state,effects){
-    if(!['NAMLNK21','NAMLNK22','NAMLNK23'].includes(state.identity))throw new Error('USB recording gain require NAMLNK21.');
+    if(!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(state.identity))throw new Error('USB recording gain require NAMLNK21.');
     const config=readRecord(effects),q=recordRequest(1,state.active,this.token()%16383+1,config,state.modelCrc);
     const reply=await this.link.request(q,m=>recordReply(m,q),'Applying USB recording gain',{mutation:true});
     if(reply.error||reply.active!==state.active||!same(reply.config,config))throw new Error('USB recording gain were not confirmed. Refresh the plug.');
@@ -163,7 +163,7 @@ export class PlugEditor {
   });}
   loadModel(expected,model,{progress=()=>{},canceled=()=>false}={}){return this.run(async()=>{
     await validateModel(model);
-    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
+    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
     const before=await this.link.snapshot();
     if(before.active!==expected.active||before.modelCrc!==expected.modelCrc||before.buffer!==expected.buffer||!same(before.effects,expected.effects)||(expected.fx&&!same(before.fx,expected.fx))||before.faults)throw new Error('The plug changed. Refresh before loading a capture.');
     const epoch=this.link.epoch;let began=false,committed=false;const session=crypto.getRandomValues(new Uint32Array(1))[0]||1;
@@ -249,7 +249,7 @@ export class PlugEditor {
     }
   }
   tune(reference=440,{canceled=()=>false,onProgress=()=>{},fast=false}={}){return this.run(async()=>{
-    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
+    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
     this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');

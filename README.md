@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.3) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.4) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -10,7 +10,7 @@ A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open
 - Tap a block symbol or its **Enabled / Bypassed** badge to toggle processing. Bypass retains the tile and settings. **Remove** and **Change block** are separate actions; drag or use arrows to reorder.
 - **FX A / FX B** each offer Pitch, Auto Wah, Chorus, Flanger, Phaser, Tremolo and Vibrato. Pitch spans −12 to +12 semitones and is intended for single notes.
 - **High / Low Cut** provides independent adjustable filters, each with Off.
-- **Master volume** controls the plug. On NAMLNK21/22/23, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
+- **Master volume** controls the plug. On NAMLNK21–24, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
 - Choose an **8 / 16 / 32-sample** output buffer. NAMLNK18+ saves it globally. This is not a measurement of total guitar latency; time-based effects can add their own delay.
 - Open **Tuner**, pluck one string, and let it ring. The plug measures the input; the page polls over Bluetooth. No microphone or browser audio playback is used.
 
@@ -29,7 +29,7 @@ The integration uses OAuth picker flows and bounded favorites/downloaded/created
 
 ## Compatibility and status
 
-Controller **0.8.3** adds NAMLNK23 support for the experimental public V3.0.5 Original firmware port. Capture transfers, both FX blocks, NAM controls, USB recording gain, tuner, presets and global 8/16/32-sample buffering pass offline controller tests. Connection/status reads do not change plug playback. Physical coverage remains limited; guitar and Bluetooth playback have been reported on the development unit, while full controller/USB coverage remains pending; updating this page does not install firmware or change DSP sound.
+Controller **0.8.4** adds NAMLNK24 recognition and **Drive → Touch Wah** with Type, Wow, Sense, Direction and Level. The new type is only offered on NAMLNK24; older firmware remains supported. This page does not install the experimental NAMLNK24 candidate. Capture transfers, both FX blocks, NAM controls, USB recording gain, tuner, presets and global 8/16/32-sample buffering pass offline controller tests. Connection/status reads do not change plug playback. Physical coverage remains limited; guitar and Bluetooth playback have been reported on the development unit, while full controller/USB coverage remains pending; updating this page does not install firmware or change DSP sound.
 
 | Firmware | Available features |
 | --- | --- |
@@ -39,7 +39,9 @@ Controller **0.8.3** adds NAMLNK23 support for the experimental public V3.0.5 Or
 | NAMLNK15+ | Compact automatic tuner |
 | NAMLNK18+ | Global persistent buffer |
 | NAMLNK20+ | Active chain with Add / Remove / Change block |
-| NAMLNK21/22 | NAM tone/mix/gain and independent USB recording gain |
+| NAMLNK21–24 | NAM tone/mix/gain and independent USB recording gain |
+
+| NAMLNK24 | Retained stock Touch Wah; Daisy-derived Auto Wah remains in FX A/B |
 
 Only explicitly recognized firmware identities are enabled. Automated protocol/browser tests use simulated Bluetooth; they do not establish physical iPhone transfer speed or all effects' real-time headroom. No firmware images are distributed here.
 

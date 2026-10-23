@@ -1,9 +1,9 @@
-import {isNamRequest as isRecordRequest} from './usb-record.js?v=0.8.3';
-import { isNamRequest } from './nam-controls.js?v=0.8.3';
-import { isFxRequest } from './fx.js?v=0.8.3';
-import { modelRequest } from './model-wire.js?v=0.8.3';
-import { isReadOnlyRequest } from './protocol.js?v=0.8.3';
-import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.8.3';
+import {isNamRequest as isRecordRequest} from './usb-record.js?v=0.8.4';
+import { isNamRequest } from './nam-controls.js?v=0.8.4';
+import { isFxRequest } from './fx.js?v=0.8.4';
+import { modelRequest } from './model-wire.js?v=0.8.4';
+import { isReadOnlyRequest } from './protocol.js?v=0.8.4';
+import { MAX_TYPES, maxType, parameterIndex, validOrder, validateEffects, same, COLORS } from './controls.js?v=0.8.4';
 export function crc32(bytes) { let c=0xffffffff; for(const byte of bytes) {c^=byte; for(let i=0;i<8;i++) c=(c>>>1)^((c&1)?0xedb88320:0);} return (c^0xffffffff)>>>0; }
 export const word=(b,at)=>new DataView(Uint8Array.from(b).buffer).getUint32(at,true);
 export const put=(b,at,value)=>{for(let i=0;i<4;i++)b[at+i]=(value>>>(8*i))&255;};
@@ -40,12 +40,12 @@ export function presetRequest(op,slot,nonce,body=[]) {
 }
 export function saveBody(saved,state,name,{playOnBoot=true}={}) {
   if(typeof playOnBoot!=='boolean')throw new Error('Invalid startup output setting.');
-  validateEffects(state.effects);
+  validateEffects(state.effects,state.identity);
   if(!saved?.occupied||saved.modelCrc!==state.modelCrc||saved.slot!==state.active||saved.sha?.length!==32)throw new Error('Recall an onboard capture before saving.');
   const body=Array(112).fill(0);put(body,0,state.modelCrc);put(body,4,crc32(state.effects));put(body,8,playOnBoot?1:0);put(body,12,state.buffer);
   body.splice(16,32,...saved.sha);const bytes=nameBytes(name);body.splice(48,bytes.length,...bytes);return body;
 }
-export function presetReply(wire,request) {
+export function presetReply(wire,request,identity='NAMLNK14') {
   if(wire.length!==326||!prefix(wire,NS)||wire.at(-1)!==247)return null;
   let raw;try{raw=unpack7(wire.slice(9,-1));}catch{return null;}
   const req=rawPreset(request);
@@ -57,7 +57,7 @@ export function presetReply(wire,request) {
   if(word(header,0)!==0x3142504e||word(header,4)!==1||word(header,8)!==slot||!word(header,12)||!word(header,16)||word(header,20)>1||![8,16,32].includes(word(header,24))||word(header,28))return null;
   const names=header.slice(64,128),end=names.indexOf(0);if(end<1||names.slice(end).some(b=>b!==0))return null;
   try{const name=new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(names.slice(0,end)));nameBytes(name);
-    return {...base,name,generation:word(header,12),modelCrc:word(header,16),flags:word(header,20),buffer:word(header,24),sha:header.slice(32,64),effects:validateEffects(header.slice(128))};
+    return {...base,name,generation:word(header,12),modelCrc:word(header,16),flags:word(header,20),buffer:word(header,24),sha:header.slice(32,64),effects:validateEffects(header.slice(128),identity)};
   }catch{return null;}
 }
 export function tunerRequest(op,page,nonce) {
@@ -75,7 +75,7 @@ export const listenCommand=enabled=>[240,67,88,112,4,2,78,65,enabled?1:0,247];
 export const bufferCommand=samples=>[240,67,88,112,4,2,78,66,samples,247];
 export function allowedCommand(m,mutation=false,current=null) {
   if(isReadOnlyRequest(m))return true;
-  if(modelRequest(m))return mutation&&['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(current?.identity);
+  if(modelRequest(m))return mutation&&['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(current?.identity);
   if(isFxRequest(m,mutation,current))return true;
   if(isRecordRequest(m,mutation,current)||isNamRequest(m,mutation,current))return true;
   try{if(prefix(m,NS)){const raw=rawPreset(m);return raw[5]===1||mutation;}}catch{return false;}
@@ -88,7 +88,7 @@ export function allowedCommand(m,mutation=false,current=null) {
   }
   if(m.length===17&&prefix(m,[240,67,88,112,13,1,9])&&m[16]===247)return validOrder(m.slice(7,16));
   if(m.length===10&&prefix(m,[240,67,88,112,4,2,78])&&m[9]===247)return (m[7]===65&&[0,1].includes(m[8]))||(m[7]===66&&[8,16,32].includes(m[8]));
-  if(m.length===14&&prefix(m,NU)&&m[9]>=3){try{return ['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23'].includes(current?.identity)&&same(m,compactTunerRequest(m[9],m[11]+128*m[12]));}catch{return false;}}
+  if(m.length===14&&prefix(m,NU)&&m[9]>=3){try{return ['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(current?.identity)&&same(m,compactTunerRequest(m[9],m[11]+128*m[12]));}catch{return false;}}
   if(m.length===14&&prefix(m,NU)){try{return same(m,tunerRequest(m[9],m[10],m[11]+128*m[12]));}catch{return false;}}
   return false;
 }
