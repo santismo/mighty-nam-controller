@@ -37,7 +37,7 @@ export function decodeLoop(words,identity) {
   const seconds=settings?(settings>>>16)&255:30,threshold=settings?settings&255:40,volume=settings?(settings>>>8)&255:50;
   if(state>5||length>720000||cursor>length||error>3||flags>15||![30,60].includes(seconds)||threshold<12||threshold>60||volume>100)throw new Error('Invalid loop state.');
   return {state,length,cursor,pending,sequence,error,faults,seconds,threshold,volume,rate:seconds===60?12000:24000,
-    mode:Boolean(flags&1),overdub:Boolean(flags&2),committing:Boolean(flags&4),extended:identity!=='NAMLNK25',peak};
+    mode:Boolean(flags&1),overdub:Boolean(flags&2),committing:Boolean(flags&4),reverse:Boolean(flags&8),extended:identity!=='NAMLNK25',peak};
 }
 export function thresholdMeter(peak,threshold){
   if(peak===null||peak===undefined)return {available:false,percent:0,above:false,label:'Live level needs NAMLNK27'};

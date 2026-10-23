@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.7) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.8) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -27,11 +27,33 @@ Use one controller at a time. Refresh after using the physical PRESET button. Ra
 
 The integration uses OAuth picker flows and bounded favorites/downloaded/created/trending/latest feeds. Full search stays on TONE3000. Downloads are user-requested, with creator and license metadata retained. No catalog mirroring, private API key, proxy account or bundled captures. Clearing browser data removes local favorites/downloads, not onboard presets. Up to 64 selected captures are cached locally. Tokens remain in memory; reloading requires signing in through the picker again.
 
-On NAMLNK27, the threshold slider also shows the recent raw guitar input peak. The white marker is the trigger threshold; the bar turns green when the input reaches it and blue below it. The reading updates while the panel is open. Firmware 25/26 cannot supply this meter.
+On NAMLNK27, the threshold slider also shows the recent raw guitar input peak. The white marker is the trigger threshold; the bar turns green when the input reaches it and blue below it. The reading updates while the panel is open. Version 0.8.8 keeps background reads visually quiet and waits for an active read before sending a user action. The control-state line shows the physical button mode and forward/reverse preset order. Firmware 25/26 cannot supply this meter.
+
+## Physical gestures (NAMLNK26/27)
+
+| Action | Gesture |
+| --- | --- |
+| Enter looper with no loop | Double-tap POWER, taps within about 300 ms |
+| Arm / cancel waiting | Tap PRESET in looper controls; the LED flashes while armed |
+| Start recording | Play above the selected threshold |
+| Finish recording and play | Tap and release PRESET; NAMLNK27 also handles phone-armed recordings in either control mode |
+| Pause / resume | Tap PRESET in looper controls |
+| Clear loop | Hold PRESET about 0.8 seconds in looper controls, then release |
+| Switch to preset controls while loop plays | Tap POWER once; allow about 300 ms for the single-tap decision |
+| Return to loop controls with a retained loop | Tap POWER once |
+| Stop loop and leave looper controls | Double-tap POWER; the completed recording is retained |
+| Reverse preset direction | In preset controls, hold PRESET about 0.8 seconds and release; the next tap changes color |
+
+Holding PRESET again in preset controls restores forward order. With Green,
+Orange and Red occupied, reverse order from Green is Red → Orange → Green.
+The direction resets to forward at startup. Opening the phone Looper panel alone
+does not change button mode; its mode button names the mode it will switch to.
+Overdub is started/finished from the phone or Mac, with no physical gesture yet.
+The selected threshold (including −50 dB) lasts until power-off; startup is −40 dB.
 
 ## Compatibility and status
 
-Controller **0.8.7** recognizes NAMLNK25, NAMLNK26 and NAMLNK27 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–27; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
+Controller **0.8.8** recognizes NAMLNK25, NAMLNK26 and NAMLNK27 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–27; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
 ## Looper
 

@@ -1,16 +1,16 @@
-import {LooperPanel} from './looper-panel.js?v=0.8.7';
-import {hasLooper} from './looper.js?v=0.8.7';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.8.7';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.8.7';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.8.7';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.8.7';
-import { PlugConnection } from './device.js?v=0.8.7';
-import { PlugEditor } from './editor.js?v=0.8.7';
-import { LiveEdits } from './live.js?v=0.8.7';
-import { AutoTuner } from './auto-tuner.js?v=0.8.7';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.8.7';
-import { nameBytes } from './commands.js?v=0.8.7';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.8.7';
+import {LooperPanel} from './looper-panel.js?v=0.8.8';
+import {hasLooper} from './looper.js?v=0.8.8';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.8.8';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.8.8';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.8.8';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.8.8';
+import { PlugConnection } from './device.js?v=0.8.8';
+import { PlugEditor } from './editor.js?v=0.8.8';
+import { LiveEdits } from './live.js?v=0.8.8';
+import { AutoTuner } from './auto-tuner.js?v=0.8.8';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.8.8';
+import { nameBytes } from './commands.js?v=0.8.8';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.8.8';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -41,6 +41,7 @@ const autoTuner=new AutoTuner({
 });
 const tones=new ToneBrowser({onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
 const live=new LiveEdits(editor,{
+  beforeSend:()=>looper.whenIdle(),
   changed:()=>status(),
   accepted:state=>{snapshot=state;message('Applied');status();},
   failed:error=>{needsRefresh=true;message(error.message,true);render();}
@@ -89,7 +90,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.8.7 · ${snapshot.identity}`:'0.8.7';
+  $('version').textContent=ready?`0.8.8 · ${snapshot.identity}`:'0.8.8';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -177,7 +178,7 @@ function edit(change,redraw=true){
 function move(id,to){edit(next=>{const order=fullOrder(next,fx),from=order.indexOf(id),dest=order.indexOf(to);order.splice(from,1);order.splice(dest,0,id);const changed=reorder(next,fx,order);next.splice(0,128,...changed.effects);fx=changed.fx;});}
 async function work(label,action){
   if(locked())return;busy=true;const ticket=++operation;message(label);status();
-  try{await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
+  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();}}
 }
 function clear(){looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}

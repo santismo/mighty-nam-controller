@@ -44,6 +44,8 @@ test('loop replies validate nonce, opcode, seven-bit payload, and full-width wor
     const bad=[...r];bad[i]=v;assert.equal(loopReply(bad,q),null);
   }
   const state=decodeLoop(words,'NAMLNK26');assert.equal(state.mode,true);assert.equal(state.seconds,60);assert.equal(state.rate,12000);
+  assert.equal(decodeLoop([words[0]|2048,...words.slice(1)],'NAMLNK26').reverse,true);
+  assert.equal(state.reverse,false);
   assert.throws(()=>decodeLoop([6,...words.slice(1)],'NAMLNK26'));
   assert.throws(()=>decodeLoop([...words.slice(0,6),40|(50<<8)|(45<<16),0],'NAMLNK26'));
 });
