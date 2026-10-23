@@ -10,7 +10,7 @@ A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open
 - Tap a block symbol or its **Enabled / Bypassed** badge to toggle processing. Bypass retains the tile and settings. **Remove** and **Change block** are separate actions; drag or use arrows to reorder.
 - **FX A / FX B** each offer Pitch, Auto Wah, Chorus, Flanger, Phaser, Tremolo and Vibrato. Pitch spans −12 to +12 semitones and is intended for single notes.
 - **High / Low Cut** provides independent adjustable filters, each with Off.
-- **Master volume** controls the plug. On NAMLNK21/22, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
+- **Master volume** controls the plug. On NAMLNK21/22/23, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
 - Choose an **8 / 16 / 32-sample** output buffer. NAMLNK18+ saves it globally. This is not a measurement of total guitar latency; time-based effects can add their own delay.
 - Open **Tuner**, pluck one string, and let it ring. The plug measures the input; the page polls over Bluetooth. No microphone or browser audio playback is used.
 
@@ -29,7 +29,7 @@ The integration uses OAuth picker flows and bounded favorites/downloaded/created
 
 ## Compatibility and status
 
-Controller **0.8.3** adds NAMLNK23 support for the experimental public V3.0.5 Original firmware port. Capture transfers, both FX blocks, NAM controls, USB recording gain, tuner, presets and global 8/16/32-sample buffering pass offline controller tests. Connection/status reads do not change plug playback. Physical NAMLNK23 validation remains pending; updating this page does not install firmware or change DSP sound.
+Controller **0.8.3** adds NAMLNK23 support for the experimental public V3.0.5 Original firmware port. Capture transfers, both FX blocks, NAM controls, USB recording gain, tuner, presets and global 8/16/32-sample buffering pass offline controller tests. Connection/status reads do not change plug playback. Physical coverage remains limited; guitar and Bluetooth playback have been reported on the development unit, while full controller/USB coverage remains pending; updating this page does not install firmware or change DSP sound.
 
 | Firmware | Available features |
 | --- | --- |
@@ -50,3 +50,9 @@ Serve this directory over HTTPS, or localhost for development. No build step. Ru
 The canonical page is now **https://santismo.github.io/mighty-nam-controller/**. Update bookmarks; GitHub Pages does not redirect repository project URLs automatically. This is the same origin, so retained local storage remains available in the same browser. Bluetooth permission may need to be granted again.
 
 Original source: **MIT © 2026 santismo**. Mightier Amp notices are retained. NUX hardware/firmware and creator captures have separate rights. See [legal notes](LEGAL.md) and [privacy](PRIVACY.md). No affiliation or endorsement by NUX, Neural Amp Modeler or TONE3000 is claimed.
+
+## Firmware compatibility
+
+NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/builder.html). The DaisySP wah replacement, reverse preset-cycling gesture and double-POWER looper entry are offline research, not available features yet.
+
+The planned looper uses single POWER to switch between preset and loop controls, PRESET to arm/finish/pause/resume, and double POWER to stop and exit. See the [offline control tests and memory investigation](https://github.com/santismo/mighty-nam/blob/main/docs/looper-research.md); this is not part of controller 0.8.3.
