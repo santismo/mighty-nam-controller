@@ -1,11 +1,11 @@
 // Explicit, serialized looper commands. No audio streams, mute or flash writes.
 const PREFIX=[240,67,88,112,4,2,78,79,1];
 const same=(a,b)=>a.length===b.length&&a.every((x,i)=>x===b[i]);
-export const hasLooper=identity=>['NAMLNK25','NAMLNK26'].includes(identity);
+export const hasLooper=identity=>['NAMLNK25','NAMLNK26', 'NAMLNK27'].includes(identity);
 export function loopRequest(op,arg,nonce,identity) {
   if(!hasLooper(identity)||!Number.isInteger(nonce)||nonce<1||nonce>16383||!Number.isInteger(arg)||!Number.isInteger(op))throw new Error('Unsupported looper request.');
-  const next=identity==='NAMLNK26';
-  if(!(op===0&&arg>=0&&arg<=(next?5:4)||op===1&&arg>=1&&arg<=(next?10:5)||next&&op===2&&arg>=12&&arg<=60||next&&op===3&&arg>=0&&arg<=100||next&&op===4&&[30,60].includes(arg)))throw new Error('Invalid looper control.');
+  const next=['NAMLNK26','NAMLNK27'].includes(identity);
+  if(!(op===0&&arg>=0&&arg<=(identity==='NAMLNK27'?6:next?5:4)||op===1&&arg>=1&&arg<=(next?10:5)||next&&op===2&&arg>=12&&arg<=60||next&&op===3&&arg>=0&&arg<=100||next&&op===4&&[30,60].includes(arg)))throw new Error('Invalid looper control.');
   return [...PREFIX,op,arg,nonce&127,nonce>>>7,247];
 }
 export function isLoopRequest(message,mutation,current) {
@@ -22,9 +22,14 @@ export function loopReply(message,request) {
 }
 export function decodeLoop(words,identity) {
   let state,length,cursor,pending,sequence,error,settings,faults,flags=0;
-  if(identity==='NAMLNK26'){
+  let peak=null;
+  if(['NAMLNK26','NAMLNK27'].includes(identity)){
     if(words.length!==8)throw new Error('Invalid loop status.');
     [state,length,cursor,pending,sequence,error,settings,faults]=words;flags=state>>>8;state&=255;
+    if(identity==='NAMLNK27'){
+      if(error>>>24)throw new Error('Invalid input meter.');
+      peak=(error>>>8)/65535;error&=255;
+    }
   }else{
     if(identity!=='NAMLNK25'||words.length!==40||words[0]!==0x4c4f5031||words[1]!==1||words[2]!==2)throw new Error('Invalid loop status.');
     state=words[8];length=words[9];cursor=words[10];pending=words[12];sequence=words[13];error=words[14];faults=words[3];
@@ -32,7 +37,13 @@ export function decodeLoop(words,identity) {
   const seconds=settings?(settings>>>16)&255:30,threshold=settings?settings&255:40,volume=settings?(settings>>>8)&255:50;
   if(state>5||length>720000||cursor>length||error>3||flags>15||![30,60].includes(seconds)||threshold<12||threshold>60||volume>100)throw new Error('Invalid loop state.');
   return {state,length,cursor,pending,sequence,error,faults,seconds,threshold,volume,rate:seconds===60?12000:24000,
-    mode:Boolean(flags&1),overdub:Boolean(flags&2),committing:Boolean(flags&4),extended:identity==='NAMLNK26'};
+    mode:Boolean(flags&1),overdub:Boolean(flags&2),committing:Boolean(flags&4),extended:identity!=='NAMLNK25',peak};
+}
+export function thresholdMeter(peak,threshold){
+  if(peak===null||peak===undefined)return {available:false,percent:0,above:false,label:'Live level needs NAMLNK27'};
+  const db=peak>0?20*Math.log10(peak):-96;
+  return {available:true,percent:Math.max(0,Math.min(100,(db+60)/48*100)),above:db>=-threshold,
+    label:`Input ${db<-60?'below −60':db.toFixed(0)} dB · ${db>=-threshold?'above':'below'} threshold`};
 }
 export class Looper {
   constructor(connection){this.connection=connection;this.nonce=0;}
@@ -44,7 +55,7 @@ export class Looper {
   }
   async read(){
     const identity=this.connection.current?.identity;
-    if(identity==='NAMLNK26')return decodeLoop(await this.request(0,5),identity);
+    if(['NAMLNK26','NAMLNK27'].includes(identity))return decodeLoop(await this.request(0,identity==='NAMLNK27'?6:5),identity);
     const words=[];for(let i=0;i<5;i++)words.push(...await this.request(0,i));return decodeLoop(words,identity);
   }
   async change(op,arg){

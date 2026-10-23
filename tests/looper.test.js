@@ -1,18 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {loopRequest,loopReply,decodeLoop,Looper} from '../src/looper.js';
+import {loopRequest,loopReply,decodeLoop,Looper,thresholdMeter} from '../src/looper.js';
 import {allowedCommand} from '../src/commands.js';
 import {PlugConnection} from '../src/device.js';
 import {PlugEditor} from '../src/editor.js';
 import {editingBluetooth} from './editor-fixture.js';
 const reply=(q,words,error=0)=>[...q.slice(0,9),q[9]|64,...q.slice(10,13),error,...words.flatMap(n=>Array.from({length:5},(_,j)=>Math.floor(n/2**(7*j))&127)),247];
+test('live input meter shares the threshold dB scale and uses one read-only reply',async()=>{
+  const peak=Math.round(.02*65535),words=[257,0,0,0,1,peak<<8,40|(50<<8)|(30<<16),0];
+  const requests=[];
+  const link={current:{identity:'NAMLNK27'},request:async(q,parse,label,{mutation})=>{
+    requests.push(q);assert.equal(q[9],0);assert.equal(q[10],6);assert.equal(mutation,false);return parse(reply(q,words));
+  }};
+  const state=await new Looper(link).read();assert.equal(requests.length,1);
+  const meter=thresholdMeter(state.peak,40);assert.ok(meter.above&&meter.percent>50&&meter.percent<60);
+  assert.equal(thresholdMeter(state.peak,20).above,false);
+  assert.equal(thresholdMeter(0,60).percent,0);assert.equal(thresholdMeter(null,40).available,false);
+  assert.equal(thresholdMeter(1,12).percent,100);
+  assert.throws(()=>decodeLoop([...words.slice(0,5),0x1000000,...words.slice(6)],'NAMLNK27'));
+  assert.throws(()=>loopRequest(0,6,1,'NAMLNK26'));
+  assert.equal(allowedCommand(loopRequest(0,6,1,'NAMLNK27'),false,{identity:'NAMLNK27'}),true);
+});
 test('loop requests are firmware-gated, bounded, and never mute/write flash',()=>{
-  for(const identity of ['NAMLNK25','NAMLNK26'])for(const [op,arg] of [[0,0],[0,4],[1,1],[1,5]]){
+  for(const identity of ['NAMLNK25','NAMLNK26','NAMLNK27'])for(const [op,arg] of [[0,0],[0,4],[1,1],[1,5]]){
     const q=loopRequest(op,arg,16383,identity);
     assert.equal(allowedCommand(q,op>0,{identity}),true);
     assert.equal(allowedCommand(q,false,{identity}),op===0);
     assert.equal(allowedCommand(q,true,{identity:'NAMLNK24'}),false);
-    assert.equal(allowedCommand(q,true,{identity:'NAMLNK27'}),false);
+    assert.equal(allowedCommand(q,true,{identity:'NAMLNK28'}),false);
     assert.equal(q[7],79);
   }
   for(const [op,arg] of [[0,5],[1,6],[1,10],[2,12],[2,60],[3,0],[3,100],[4,30],[4,60]]){
