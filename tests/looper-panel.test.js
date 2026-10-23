@@ -49,3 +49,16 @@ test('close then reopen during a read obtains a fresh snapshot without overlappi
   first.resolve(state);await panel.whenIdle();await Promise.resolve();assert.equal(reads,2);
   second.resolve({...state,threshold:45});await panel.whenIdle();assert.equal(panel.state.threshold,45);
 });
+
+test('unchanged transport status never flips disabled buttons or replaces their text during meter polls',async t=>{
+  const {panel,state,get,locks}=setup(t);panel.state={...state,state:3};panel.render();
+  const changes=[];
+  for(const id of ['loop-arm','loop-toggle','loop-stop','loop-clear','loop-overdub','loop-mode']){
+    const n=get(id);
+    for(const key of ['disabled','textContent']){let value=n[key];Object.defineProperty(n,key,{get:()=>value,set:v=>{changes.push([id,key,v]);value=v;},configurable:true});}
+  }
+  panel.loop={read:async()=>({...panel.state,peak:.04,cursor:480})};
+  for(let i=0;i<10;i++){await panel.run();clearTimeout(panel.timer);}
+  assert.deepEqual(changes,[]);assert.deepEqual(locks,[]);
+  assert.equal(get('loop-arm').disabled,true);assert.equal(get('loop-toggle').disabled,false);
+});

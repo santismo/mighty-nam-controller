@@ -1,6 +1,9 @@
-import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.8.8';
+import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.9.0';
 // A nonmodal panel lets guitar preset selection remain available between polls.
 // Shares the app's busy gate: no poll runs concurrently with a preset/model edit.
+// Avoid rewriting unchanged controls on each meter poll. WebKit visibly
+// repaints disabled/enabled buttons even when both assignments share a task.
+const put=(node,key,value)=>{if(node[key]!==value)node[key]=value;};
 export class LooperPanel {
   constructor({connection,canRun,onBusy}){
     this.connection=connection;this.canRun=canRun;this.onBusy=onBusy;this.loop=new Looper(connection);
@@ -10,6 +13,7 @@ export class LooperPanel {
     this.get('close-looper').addEventListener('click',()=>this.close());
     for(const [id,arg] of [['loop-arm',1],['loop-toggle',2],['loop-stop',4],['loop-clear',5],['loop-overdub',6]])
       this.get(id).addEventListener('click',()=>this.action(1,arg));
+    this.get('loop-save').addEventListener('click',()=>{this.settings.set(5,1);this.run();});
     this.get('loop-mode').addEventListener('click',()=>this.action(1,this.state?.mode?10:9));
     for(const [id,op] of [['loop-threshold',2],['loop-volume',3],['loop-duration',4]]){
       this.get(id).addEventListener('change',()=>{
@@ -62,16 +66,16 @@ export class LooperPanel {
     let good=false;
     try{
       const state=await(change?change():this.loop.read());
-      if(generation===this.generation&&epoch===this.connection.epoch&&this.open){this.state=state;this.get('loop-error').textContent='';good=true;}
-    }catch(error){if(generation===this.generation&&this.open){this.settings.clear();this.state=null;this.get('loop-error').textContent=error.message;}}
+      if(generation===this.generation&&epoch===this.connection.epoch&&this.open){this.state=state;put(this.get('loop-error'),'textContent','');good=true;}
+    }catch(error){if(generation===this.generation&&this.open){this.settings.clear();this.state=null;put(this.get('loop-error'),'textContent',error.message);}}
     finally{this.busy=false;this.changing=false;this.notifyBusy();this.render();}
     if(good&&this.open&&!this.actionWaiting&&generation===this.generation)this.timer=setTimeout(()=>this.run(),this.settings.size?0:this.state?.peak!==null?125:500);
   }
   labels(){
-    this.get('loop-threshold-value').textContent=`${this.get('loop-threshold').value} dB`;
-    this.get('loop-volume-value').textContent=`${this.get('loop-volume').value}%`;
+    put(this.get('loop-threshold-value'),'textContent',`${this.get('loop-threshold').value} dB`);
+    put(this.get('loop-volume-value'),'textContent',`${this.get('loop-volume').value}%`);
     const meter=thresholdMeter(this.state?.peak,-Number(this.get('loop-threshold').value));
-    this.get('loop-input-level').textContent=this.state?meter.label:'Input —';
+    put(this.get('loop-input-level'),'textContent',this.state?meter.label:'Input —');
     this.get('loop-threshold-meter').style.setProperty('--input-percent',`${meter.percent}%`);
     this.get('loop-threshold-meter').classList.toggle('above',meter.above);
     this.get('loop-threshold').setAttribute('aria-valuetext',`${this.get('loop-threshold').value} dB; ${this.state?meter.label:'input unavailable'}`);
@@ -79,25 +83,27 @@ export class LooperPanel {
   render(){
     const s=this.state,disabled=this.changing||this.actionWaiting||!s||!this.connection.connected||Boolean(s?.faults);
     const names=['Empty','Armed · waiting for guitar','Recording','Playing','Paused','Stopped'];
-    this.get('loop-state').textContent=s?.faults?'Memory check failed':s?.overdub?'Overdubbing':s?names[s.state]:'Reading…';
-    this.get('loop-time').textContent=s?`${(s.length/s.rate).toFixed(1)} / ${s.seconds} s`:'—';
+    put(this.get('loop-state'),'textContent',s?.faults?'Memory check failed':s?.overdub?'Overdubbing':s?names[s.state]:'Reading…');
+    put(this.get('loop-time'),'textContent',s?`${(s.length/s.rate).toFixed(1)} / ${s.seconds} s`:'—');
     this.get('loop-state').classList.toggle('armed',s?.state===1);
-    for(const b of this.get('looper-panel').querySelectorAll('button:not(#close-looper),input,select'))b.disabled=disabled;
-    this.get('loop-refresh').disabled=this.changing||this.actionWaiting;
-    this.get('loop-arm').disabled=disabled||s.state!==0;
-    this.get('loop-toggle').disabled=disabled||s.state===0;
-    this.get('loop-toggle').textContent=s?.state===1?'Cancel arm':s?.state===2?'Finish loop':s?.state===3?'Pause':'Play';
-    this.get('loop-stop').disabled=disabled||s.state===0;
-    this.get('loop-clear').disabled=disabled||s.state===0||!s.extended&&[2,3].includes(s.state);
-    this.get('loop-overdub').disabled=disabled||!s.extended||s.state!==3;
-    this.get('loop-overdub').textContent=s?.overdub?'Finish layer':'Overdub';
-    this.get('loop-mode').disabled=disabled||!s.extended;
-    this.get('loop-mode').textContent=s?.mode?'Preset controls':'Looper controls';
-    this.get('loop-control-state').textContent=s?.extended?`Buttons: ${s.mode?'Looper':'Presets'} · Preset order: ${s.reverse?'Reverse':'Forward'}`:'';
+    put(this.get('loop-refresh'),'disabled',this.changing||this.actionWaiting);
+    put(this.get('loop-arm'),'disabled',disabled||s.state!==0);
+    put(this.get('loop-toggle'),'disabled',disabled||s.state===0);
+    put(this.get('loop-toggle'),'textContent',s?.state===1?'Cancel arm':s?.state===2?'Finish loop':s?.state===3?'Pause':'Play');
+    put(this.get('loop-stop'),'disabled',disabled||s.state===0);
+    put(this.get('loop-clear'),'disabled',disabled||s.state===0||!s.extended&&[2,3].includes(s.state));
+    put(this.get('loop-overdub'),'disabled',disabled||!s.extended||s.state!==3);
+    put(this.get('loop-overdub'),'textContent',s?.overdub?'Finish layer':'Overdub');
+    put(this.get('loop-mode'),'disabled',disabled||!s.extended);
+    put(this.get('loop-mode'),'textContent',s?.mode?'Preset controls':'Looper controls');
+    put(this.get('loop-control-state'),'textContent',s?.extended?`Buttons: ${s.mode?'Looper':'Presets'}${s.saveSupported?'':` · Preset order: ${s.reverse?'Reverse':'Forward'}`}`:'');
+    put(this.get('loop-save'),'disabled',disabled||!s?.saveSupported||s.state!==0||s.length>0||s.saved&&!this.settings.size);
+    put(this.get('loop-save-state'),'textContent',!s?.saveSupported?'Saving settings needs NAMLNK28':s.state!==0||s.length>0?'Clear the loop before saving settings':s.saved?'Saved on plug':'Live · not saved');
+    put(this.get('loop-gestures'),'textContent',s?.saveSupported?'PRESET: tap next preset; hold previous. In Looper: tap to arm, finish, pause or play; hold to toggle overdub; tap then hold within 300 ms to clear. POWER: double tap enters Looper, or stops and exits; single tap switches between loop and preset controls. Hold POWER to turn off.': 'PRESET: tap next preset; hold reverses preset direction. In Looper: tap to arm, finish, pause or play; hold to clear. POWER: double tap enters Looper, or stops and exits; single tap switches between loop and preset controls. Overdub uses the on-screen button. Hold POWER to turn off.');
     for(const [id,op,key] of [['loop-threshold',2,'threshold'],['loop-volume',3,'volume'],['loop-duration',4,'seconds']]){
       const field=this.get(id);
-      field.disabled=this.changing||this.actionWaiting||!s||!this.connection.connected||Boolean(s?.faults)||!s?.extended||(id==='loop-duration'&&s?.state!==0);
-      if(s&&document.activeElement!==field&&!this.settings.has(op))field.value=s[key]*(op===2?-1:1);
+      put(field,'disabled',disabled||!s?.extended||(id==='loop-duration'&&s?.state!==0));
+      if(s&&document.activeElement!==field&&!this.settings.has(op))put(field,'value',String(s[key]*(op===2?-1:1)));
     }
     this.labels();
     this.get('loop-compatibility').hidden=Boolean(s?.extended);

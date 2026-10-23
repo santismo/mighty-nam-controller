@@ -1,12 +1,13 @@
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.8.8';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.8.8';
-import { fxRequest, fxReply } from './fx.js?v=0.8.8';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.8.8';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.8.8';
-import { detectPitch, pitchReading } from './tuner.js?v=0.8.8';
-import { modelPacket,modelReply } from './model-wire.js?v=0.8.8';
-import { validateModel,includesCab } from './model.js?v=0.8.8';
-import { put,crc32,nameBytes } from './commands.js?v=0.8.8';
+import {Looper,hasLooper} from './looper.js?v=0.9.0';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.9.0';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.9.0';
+import { fxRequest, fxReply } from './fx.js?v=0.9.0';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.9.0';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.9.0';
+import { detectPitch, pitchReading } from './tuner.js?v=0.9.0';
+import { modelPacket,modelReply } from './model-wire.js?v=0.9.0';
+import { validateModel,includesCab } from './model.js?v=0.9.0';
+import { put,crc32,nameBytes } from './commands.js?v=0.9.0';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -20,6 +21,12 @@ export class PlugEditor {
     if(!this.link.connected||!this.link.current)throw new Error('Connect and read the plug first.');
     this.link.busy=true;const epoch=this.link.epoch;
     try{return await action();}finally{if(epoch===this.link.epoch)this.link.busy=false;}
+  }
+  async requireWritableLoop(){
+    if(hasLooper(this.link.current?.identity)){
+      const loop=await new Looper(this.link).read();
+      if(loop.state!==0||loop.length>0)throw new Error('Clear the retained loop before saving a preset. Live edits still work.');
+    }
   }
   async preset(op,slot,body=[]){
     if(op!==1)this.requireLargeReplies();
@@ -39,7 +46,7 @@ export class PlugEditor {
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
     if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
-    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
+    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }
   async fx(op,slot,config=null,model=0){
@@ -48,13 +55,13 @@ export class PlugEditor {
     if(result.error)throw new Error('FX settings were rejected. Refresh the plug.');return result;
   }
   async nam(state,effects){
-    if(!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(state.identity))throw new Error('NAM controls require NAMLNK21.');
+    if(!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(state.identity))throw new Error('NAM controls require NAMLNK21.');
     const config=readNam(effects),q=namRequest(1,state.active,this.token()%16383+1,config,state.modelCrc);
     const reply=await this.link.request(q,m=>namReply(m,q),'Applying NAM controls',{mutation:true});
     if(reply.error||reply.active!==state.active||!same(reply.config,config))throw new Error('NAM controls were not confirmed. Refresh the plug.');
   }
   async recording(state,effects){
-    if(!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(state.identity))throw new Error('USB recording gain require NAMLNK21.');
+    if(!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(state.identity))throw new Error('USB recording gain require NAMLNK21.');
     const config=readRecord(effects),q=recordRequest(1,state.active,this.token()%16383+1,config,state.modelCrc);
     const reply=await this.link.request(q,m=>recordReply(m,q),'Applying USB recording gain',{mutation:true});
     if(reply.error||reply.active!==state.active||!same(reply.config,config))throw new Error('USB recording gain were not confirmed. Refresh the plug.');
@@ -147,23 +154,27 @@ export class PlugEditor {
     if(state.fx&&!same(state.fx,recalled.fx))throw new Error('Recalled FX settings did not match.');
     return state;
   });}
-  save(expected,effects,buffer,name,{playOnBoot=true}={}){return this.run(async()=>{
+  save(expected,effects,buffer,name,{playOnBoot=true,slot=expected.active}={}){return this.run(async()=>{
     this.requireLargeReplies();
     // Fetch the current slot before any writes. Only preserve a known onboard
     // capture; never guess its SHA or overwrite another color's model.
-    const before=await this.preset(1,expected.active);
+    if(!Number.isInteger(slot)||slot<0||slot>6)throw new Error('Choose one of the seven preset colors.');
+    await this.requireWritableLoop();
+    const known=this.bank[slot],destination=await this.preset(1,slot);
+    if(known&&(known.occupied!==destination.occupied||known.generation!==destination.generation||known.modelCrc!==destination.modelCrc))throw new Error('The destination preset changed. Refresh before saving.');
+    const before=slot===expected.active?destination:await this.preset(1,expected.active);
     saveBody(before,{...expected,effects,buffer},name,{playOnBoot});
     const state=await this.applyInternal(expected,effects,buffer);
-    const saved=await this.preset(2,state.active,saveBody(before,state,name,{playOnBoot}));
-    const checked=await this.preset(1,state.active),after=await this.link.snapshot();
-    for(const entry of [saved,checked])if(!entry.occupied||entry.active!==state.active||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==(playOnBoot?1:0)||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
+    const saved=await this.preset(2,slot,saveBody(before,state,name,{playOnBoot}));
+    const checked=await this.preset(1,slot),after=await this.link.snapshot();
+    for(const entry of [saved,checked])if(!entry.occupied||entry.active!==slot||entry.modelCrc!==before.modelCrc||!same(entry.sha,before.sha)||entry.flags!==(playOnBoot?1:0)||entry.name!==name.trim()||entry.buffer!==buffer||!same(entry.effects,effects))throw new Error('Saved preset readback did not match. Refresh before another save.');
     if(state.fx&&(!same(saved.fx,state.fx)||!same(checked.fx,state.fx)||!same(after.fx,state.fx)))throw new Error('Saved FX readback did not match.');
-    if(saved.generation!==checked.generation||checked.generation<before.generation||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==state.active||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
+    if(saved.generation!==checked.generation||checked.generation<=destination.generation||after.faults||!after.running||after.buffer!==buffer||after.modelCrc!==before.modelCrc||after.active!==slot||!same(after.effects,effects))throw new Error('Save was not fully confirmed. Refresh before another save.');
     return this.preserveOutput(after,state.listening);
   });}
   loadModel(expected,model,{progress=()=>{},canceled=()=>false}={}){return this.run(async()=>{
     await validateModel(model);
-    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
+    if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(expected.identity))throw new Error('Bluetooth capture loading requires NAMLNK14.');
     const before=await this.link.snapshot();
     if(before.active!==expected.active||before.modelCrc!==expected.modelCrc||before.buffer!==expected.buffer||!same(before.effects,expected.effects)||(expected.fx&&!same(before.fx,expected.fx))||before.faults)throw new Error('The plug changed. Refresh before loading a capture.');
     const epoch=this.link.epoch;let began=false,committed=false;const session=crypto.getRandomValues(new Uint32Array(1))[0]||1;
@@ -208,7 +219,7 @@ export class PlugEditor {
   clearTransfer(){this.unfinishedTransfer=null;try{this.recoveryStorage?.removeItem('namplug.transfer.v1');}catch{}}
   saveCapture(expected,effects,buffer,name,slot,model,{playOnBoot=true}={}){return this.run(async()=>{
     if(typeof playOnBoot!=='boolean')throw new Error('Invalid startup output setting.');
-    this.requireLargeReplies();await validateModel(model);
+    this.requireLargeReplies();await this.requireWritableLoop();await validateModel(model);
     if(!Number.isInteger(slot)||slot<0||slot>6||model.crc!==expected.modelCrc)throw new Error('Load this capture onto the plug before saving.');
     const known=this.bank[slot],before=await this.preset(1,slot);if(!known||known.occupied!==before.occupied||known.generation!==before.generation||known.modelCrc!==before.modelCrc)throw new Error('The destination preset changed. Refresh and choose the color again.');const state=await this.applyInternal(expected,effects,buffer);
     const body=Array(112).fill(0);put(body,0,model.crc);put(body,4,crc32(effects));put(body,8,playOnBoot?1:0);put(body,12,buffer);
@@ -249,7 +260,7 @@ export class PlugEditor {
     }
   }
   tune(reference=440,{canceled=()=>false,onProgress=()=>{},fast=false}={}){return this.run(async()=>{
-    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
+    if(fast&&['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(this.link.current.identity))return this.compactTune(reference,{canceled,onProgress});
     this.requireLargeReplies();
     if(!Number.isFinite(reference)||reference<430||reference>450)throw new Error('Invalid tuner reference.');
     await this.send(listenCommand(false),'Muting for tuner');

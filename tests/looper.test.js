@@ -27,7 +27,7 @@ test('loop requests are firmware-gated, bounded, and never mute/write flash',()=
     assert.equal(allowedCommand(q,op>0,{identity}),true);
     assert.equal(allowedCommand(q,false,{identity}),op===0);
     assert.equal(allowedCommand(q,true,{identity:'NAMLNK24'}),false);
-    assert.equal(allowedCommand(q,true,{identity:'NAMLNK28'}),false);
+    assert.equal(allowedCommand(q,true,{identity:'NAMLNK29'}),false);
     assert.equal(q[7],79);
   }
   for(const [op,arg] of [[0,5],[1,6],[1,10],[2,12],[2,60],[3,0],[3,100],[4,30],[4,60]]){
@@ -91,4 +91,13 @@ test('fragmented Bluetooth looper replies coexist with direct preset selection w
     assert.equal(link.current.active,2);assert.equal(fake.saveCount,0);
     assert.ok(!fake.requests.some(q=>q[7]===65&&q[8]===0),'Must not send an automatic mute');
   }finally{link.close();}
+});
+
+test('NAMLNK28 exposes explicit settings save, persisted status and firmware gating',async()=>{
+ const q=loopRequest(5,1,2,'NAMLNK28');assert.equal(allowedCommand(q,true,{identity:'NAMLNK28'}),true);assert.equal(allowedCommand(q,false,{identity:'NAMLNK28'}),false);
+ assert.throws(()=>loopRequest(5,1,1,'NAMLNK27'));assert.throws(()=>loopRequest(5,0,1,'NAMLNK28'));
+ const s=decodeLoop([0,0,0,0,2,0,50|(100<<8)|(30<<16)|(1<<24),0],'NAMLNK28');assert.equal(s.saved,true);assert.equal(s.volume,100);assert.equal(s.saveSupported,true);
+ assert.equal(decodeLoop([0,0,0,0,2,0,50|(63<<8)|(30<<16),0],'NAMLNK28').saved,false);
+ const link={current:{identity:'NAMLNK28'},request:async(q,parse)=>parse(reply(q,Array(8).fill(0),2))};
+ await assert.rejects(new Looper(link).change(5,1),/Clear the retained loop/);
 });

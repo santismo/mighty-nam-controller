@@ -1,16 +1,16 @@
-import {LooperPanel} from './looper-panel.js?v=0.8.8';
-import {hasLooper} from './looper.js?v=0.8.8';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.8.8';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.8.8';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.8.8';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.8.8';
-import { PlugConnection } from './device.js?v=0.8.8';
-import { PlugEditor } from './editor.js?v=0.8.8';
-import { LiveEdits } from './live.js?v=0.8.8';
-import { AutoTuner } from './auto-tuner.js?v=0.8.8';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.8.8';
-import { nameBytes } from './commands.js?v=0.8.8';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.8.8';
+import {LooperPanel} from './looper-panel.js?v=0.9.0';
+import {hasLooper} from './looper.js?v=0.9.0';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.9.0';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.9.0';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.9.0';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.9.0';
+import { PlugConnection } from './device.js?v=0.9.0';
+import { PlugEditor } from './editor.js?v=0.9.0';
+import { LiveEdits } from './live.js?v=0.9.0';
+import { AutoTuner } from './auto-tuner.js?v=0.9.0';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.9.0';
+import { nameBytes } from './commands.js?v=0.9.0';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.9.0';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -29,7 +29,7 @@ const blocks={
 };
 let snapshot=null,effects=null,fx=null,buffer=8,selected=3,busy=false,needsRefresh=false,operation=0,dragged=null;
 let queuedCapture=null,activeCapture=null,loadTicket=0,activeTicket=0,tuning=false,tunerResume=null;
-let loopBusy=false;
+let loopBusy=false,pickerDisconnected=false;
 const playOnBoot=true;
 const autoTuner=new AutoTuner({
   interval:40,
@@ -58,7 +58,8 @@ const locked=()=>busy||live.pending||tuning||loopBusy;
 function el(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
 function button(text,fn,label){const node=el('button',text);node.type='button';if(label)node.setAttribute('aria-label',label);node.addEventListener('click',fn);return node;}
 function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);if(error&&connection.log.length)$('connection-details').open=true;}
-function diagnostics(){$('connection-details').hidden=!connection.log.length;$('diagnostics-text').value=connection.report();}
+function diagnostics(){$('connection-details').hidden=!connection.log.length;if($('connection-details').open)$('diagnostics-text').value=connection.report();}
+$('connection-details').addEventListener('toggle',diagnostics);
 function savedMatches(){
   const saved=editor.bank[snapshot?.active];
   return Boolean(saved?.occupied&&saved.modelCrc===snapshot.modelCrc&&same(saved.effects,effects)&&(snapshot.globalBuffer||saved.buffer===buffer)&&saved.flags===(playOnBoot?1:0)&&saved.name===$('preset-name').value.trim()&&(!fx||same(saved.fx,fx)));
@@ -76,22 +77,22 @@ function status(){
   $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
   $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
-  $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
+  $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
   $('master-volume').disabled=!canEdit();$('master-volume').value=effects?.[84]??0;$('master-value').textContent=effects?`${effects[84]} %`:'—';
   $('buffer').disabled=!canEdit();$('buffer').value=String(buffer);
   const saved=editor.bank[snapshot?.active];
   $('buffer-state').textContent=!ready?'8 samples is the minimum output buffer.':live.pending?`Applying · last confirmed ${snapshot.buffer} samples`:snapshot.bufferStorageError?'Global buffer storage needs attention. Refresh the plug.':snapshot.globalBuffer?`Global · ${snapshot.buffer} samples · saved for every color`:`${snapshot.buffer} samples · this preset (global control needs NAMLNK18)`;
   const delayed=fx?[0,16].filter(i=>fx[i+1]&&fx[i+4]>0&&([3,4,7].includes(fx[i])||(fx[i]===1&&fx[i+3]!==12))).map(i=>`${i?'FX B':'FX A'} ${FX_MODES[fx[i]-1]}`):[];
   $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:snapshot?.globalBuffer?'One buffer setting applies to all colors, including after power-off.':'8 samples keeps the minimum output path. Global buffer requires NAMLNK18.';
-  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(snapshot?.identity));
+  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(snapshot?.identity));
   $('looper').disabled=!canEdit()||waiting||!hasLooper(snapshot?.identity);
   $('feature-notice').hidden=!ready||!editor.bankWarning;
   $('feature-notice').textContent=editor.bankWarning;
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.8.8 · ${snapshot.identity}`:'0.8.8';
-  for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting||!editor.bank[Number(node.dataset.slot)]?.occupied;
+  $('version').textContent=ready?`0.9.0 · ${snapshot.identity}`:'0.9.0';
+  for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
@@ -146,7 +147,7 @@ function detail(){
   $('nam-controls').hidden=!ready||selected!==3;tones.showActive(activeCapture);
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
-  if(ready&&selected===3&&['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(snapshot.identity))for(const p of namParameters){
+  if(ready&&selected===3&&['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(snapshot.identity))for(const p of namParameters){
     const config=readNam(effects),label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output',p.label(config[p.index])),control=el('input');
     heading.append(value);control.type='range';control.min=0;control.max=p.max;control.step=1;control.value=config[p.index];control.setAttribute('aria-label',p.name);
     control.addEventListener('input',()=>{value.textContent=p.label(Number(control.value));edit(next=>{const c=readNam(next);c[p.index]=Number(control.value);putNam(next,c);},false);});label.append(heading,control);$('parameters').append(label);
@@ -183,6 +184,7 @@ async function work(label,action){
 }
 function clear(){looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}
 async function recall(slot){
+  if(!editor.bank[slot]?.occupied){openSave(slot);return;}
   if(slot===snapshot?.active&&savedMatches())return;
   if(!savedMatches()&&!confirm('Switch preset and discard the unsaved changes?'))return;
   await work('Loading preset…',async()=>{accept(await editor.recall(slot));message(`${COLORS[slot]} loaded.`);});
@@ -192,21 +194,20 @@ $('connect').addEventListener('click',async()=>{
   await work('Choose your Mighty Plug Pro.',async()=>{accept(await connection.connect());await editor.readBank();accept(connection.current);message(editor.bankWarning?'Connected':'Connected');if(queuedCapture)await transferCapture(queuedCapture);});
 });
 $('refresh').addEventListener('click',()=>work('Reading the plug…',async()=>{await connection.refresh();await editor.readBank();accept(connection.current);message(editor.bankWarning?'Status updated. Live controls are ready.':'Status updated.');}));
-$('save').addEventListener('click',()=>{
+function openSave(slot=snapshot?.active<7?snapshot.active:0){
+  if(!canEdit()||locked())return;
   try{nameBytes($('preset-name').value);}catch(error){message(error.message,true);return;}
-  if(activeCapture){
-    $('save-color').replaceChildren(...COLORS.map((color,i)=>{const option=el('option',`${i+1}. ${color}${editor.bank[i]?.occupied?` · ${editor.bank[i].name}`:' · Empty'}`);option.value=i;return option;}));
-    $('save-color').value=String(snapshot.active<7?snapshot.active:0);saveDestination();$('save-dialog').showModal();return;
-  }
-  work('Saving preset to plug…',async()=>{accept(await editor.save(snapshot,effects,buffer,$('preset-name').value,{playOnBoot}));message(`Saved · ${COLORS[snapshot.active]}`);});
-});
+  $('save-color').replaceChildren(...COLORS.map((color,i)=>{const option=el('option',`${i+1}. ${color}${editor.bank[i]?.occupied?` · ${editor.bank[i].name}`:' · Empty'}`);option.value=i;return option;}));
+  $('save-color').value=String(slot);saveDestination();$('save-dialog').showModal();
+}
+$('save').addEventListener('click',()=>openSave());
 function saveDestination(){const row=editor.bank[Number($('save-color').value)];$('save-destination').textContent=row?.occupied?`Replaces “${row.name}” in ${COLORS[row.slot]}.`:'This color is empty.';}
 $('save-color').addEventListener('change',saveDestination);$('close-save').addEventListener('click',()=>$('save-dialog').close());
 $('confirm-save').addEventListener('click',()=>{
-  if(!canEdit()||locked()||!activeCapture)return;
+  if(!canEdit()||locked())return;
   const slot=Number($('save-color').value),model=activeCapture,name=$('preset-name').value,view=[...retained];
   try{nameBytes(name);}catch(e){message(e.message,true);return;}
-  $('save-dialog').close();work('Saving capture and chain…',async()=>{const saved=await editor.saveCapture(snapshot,effects,buffer,name,slot,model,{playOnBoot});chainView.write(slot,view);accept(saved);message(`Saved capture and effects to ${COLORS[slot]}. Playback ${snapshot.listening?'on':'muted'}.`);});
+  $('save-dialog').close();work('Saving capture and chain…',async()=>{const saved=model?await editor.saveCapture(snapshot,effects,buffer,name,slot,model,{playOnBoot}):await editor.save(snapshot,effects,buffer,name,{playOnBoot,slot});chainView.write(slot,view);accept(saved);message(`Saved capture and effects to ${COLORS[slot]}. Playback ${snapshot.listening?'on':'muted'}.`);});
 });
 function chooseBlock(replacing=false){
   if(!canEdit()||!compact())return;
@@ -266,7 +267,7 @@ $('tuner-dialog').addEventListener('close',async()=>{
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){autoTuner.stop();}else if($('tuner-dialog').open&&!needsRefresh&&!tuning&&online())autoTuner.start();});
 connection.addEventListener('diagnostic',diagnostics);
-connection.addEventListener('disconnected',event=>{clear();message(`Bluetooth disconnected during: ${event.detail.stage}.`,true);});
+connection.addEventListener('disconnected',event=>{if(tones.picker.active){pickerDisconnected=true;looper.close();autoTuner.stop();live.reset(null);status();message('Bluetooth paused by the phone. Return here after selecting a capture.');}else{clear();message(`Bluetooth disconnected during: ${event.detail.stage}.`,true);}});
 $('copy-report').addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText(connection.report());$('copy-status').textContent='Report copied.';}
   catch{const field=$('diagnostics-text');field.focus();field.select();field.setSelectionRange(0,field.value.length);$('copy-status').textContent='Select and copy the report below.';}
@@ -287,6 +288,9 @@ function showQueued(){
 async function selectCapture(model){
   if(locked())throw new Error('Wait for the plug to finish its current operation.');
   queuedCapture=model;showQueued();
+  if(!connection.connected&&pickerDisconnected&&connection.lastDevice){
+    await work('Reconnecting to the plug…',async()=>{await connection.reconnect();await editor.readBank();accept(connection.current);pickerDisconnected=false;});
+  }
   if(!connection.connected){tones.say('Downloaded. Close Captures and tap Connect to load it onto the plug.');message('Capture ready. Tap Connect to load it onto the plug.');return;}
   if(needsRefresh)throw new Error('Capture downloaded. Refresh the plug before loading it.');
   let loaded=false;
@@ -295,7 +299,7 @@ async function selectCapture(model){
 }
 async function transferCapture(model){
   const ticket=++loadTicket;
-  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
+  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
   const state=await editor.loadModel(snapshot,model,{canceled:()=>ticket!==loadTicket,progress:(n,total)=>{const text=`Loading ${captureName(model)} · ${Math.round(n/total*100)}%`;message(text);tones.say(text);}});
   activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();tones.say(`${captureName(model)} is active. Keep browsing to try another capture.`);message(`${captureName(model)} loaded`);
 }

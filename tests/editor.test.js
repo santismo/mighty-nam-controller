@@ -101,3 +101,13 @@ test('lost save acknowledgement is never retried or reported as saved',async()=>
 test('queued live edits are discarded when the connection is reset',async()=>{
   let calls=0;const q=new LiveEdits({live:async()=>{calls++;}});q.reset({});q.update([1],8);q.reset(null);await pause(80);assert.equal(calls,0);assert.equal(q.pending,false);
 });
+
+test('copy the current onboard capture into any empty color without a phone download',async()=>{
+ const fake=editingBluetooth({identity:'NAMLNK28',mask:7}),link=new PlugConnection(fake.bluetooth,500,0,0),editor=new PlugEditor(link);
+ try{await link.connect();await editor.readBank();const before=fake.bank.map(h=>[...h]);
+ for(const slot of [3,5,6,4]){const state=link.current;await editor.save(state,state.effects,8,`New ${slot}`,{slot});assert.equal(link.current.active,slot);assert.equal(editor.bank[slot].modelCrc,0x12345678);}
+ assert.equal(fake.saveCount,4);assert.equal((fake.words[25]>>8)&127,127);
+ assert.deepEqual(fake.bank.slice(0,3).map(h=>[...h]),before.slice(0,3));
+ assert.equal(fake.requests.filter(q=>q[7]===76).length,0);
+ }finally{link.close();}
+});

@@ -1,5 +1,6 @@
-import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.8.8';
-import { CaptureLibrary, parseModel } from './model.js?v=0.8.8';
+import {TonePicker} from './tone-picker.js?v=0.9.0';
+import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.9.0';
+import { CaptureLibrary, parseModel } from './model.js?v=0.9.0';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,fn,cls='secondary-button')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};
@@ -17,6 +18,7 @@ export function captureCard(tone,modelName=null){
 export class ToneBrowser {
   constructor({onSelect,onChange=()=>{},isBusy=()=>false,client=new ToneClient(),library=new CaptureLibrary(localStorage)}){
     Object.assign(this,{onSelect,onChange,isBusy,client,library});this.ticket=0;this.waiting=false;this.active=null;this.pending=null;this.view='local';
+    this.picker=new TonePicker({returned:url=>this.callback(url)});
     $('open-captures').onclick=() =>this.open();$('nam-browse').onclick=()=>this.open();$('close-tones').onclick=()=>$('tone-dialog').close();
     $('tone-catalog').onclick=()=>this.authorize();$('tone-collection').onchange=()=>this.list();$('tone-gear').onchange=()=>this.list();$('tone-local-search').oninput=()=>{if(['local','favorites'].includes($('tone-collection').value))this.list();};
     $('tone-back').onclick=()=>this.list();$('tone-signout').onclick=()=>{this.ticket++;this.client.signOut();$('tone-account').replaceChildren();$('tone-collection').value='local';this.list();};
@@ -28,10 +30,10 @@ export class ToneBrowser {
   open(){if(!$('tone-dialog').open)$('tone-dialog').showModal();if(!this.waiting)this.list();}
   async authorize(toneId=null){
     if(this.waiting||this.isBusy())return;
-    await this.job('Opening TONE3000…',async()=>{const redirect=new URL('./',location.href);redirect.search='';redirect.hash='';location.assign(await this.client.authorize(redirect.href,{toneId,gear:$('tone-gear').value}));});
+    await this.job('Opening TONE3000…',async()=>{const redirect=new URL('./',location.href);redirect.search='';redirect.hash='';await this.picker.open(()=>this.client.authorize(redirect.href,{toneId,gear:$('tone-gear').value}));this.say('Select a tone in the TONE3000 tab. Keep this controller tab open.');});
   }
   async callback(url){
-    $('tone-dialog').showModal();
+    if(!$('tone-dialog').open)$('tone-dialog').showModal();
     await this.job('Finishing TONE3000 sign-in…',async()=>{
       const id=await this.client.complete(url);
       try{const user=await this.client.profile();$('tone-account').replaceChildren(creator(user));}catch{ $('tone-account').textContent='Signed in'; }

@@ -1,10 +1,10 @@
-import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.8.8';
-import { fxRequest, fxReply } from './fx.js?v=0.8.8';
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.8.8';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.9.0';
+import { fxRequest, fxReply } from './fx.js?v=0.9.0';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.9.0';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.8.8';
-import { allowedCommand } from './commands.js?v=0.8.8';
-import { validateEffects } from './controls.js?v=0.8.8';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.9.0';
+import { allowedCommand } from './commands.js?v=0.9.0';
+import { validateEffects } from './controls.js?v=0.9.0';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -15,7 +15,7 @@ export class PlugConnection extends EventTarget {
     super(); this.bluetooth = bluetooth; this.timeout = timeout; this.settle = settle; this.spacing = spacing;
     this.epoch = 0; this.pending = null; this.busy = false; this.device = null; this.characteristic = null;
     this.ready = false; this.writeStalled = false; this.writeMethod = null; this.lastWrite = 0;
-    this.current = null;
+    this.current = null; this.lastDevice = null;
     this.log = []; this.stage = 'Idle'; this.notifications = 0; this.frames = 0; this.started = Date.now();
     this.decoder = new SysExDecoder(message => this.receive(message));
     this.onValue = event => {
@@ -39,10 +39,14 @@ export class PlugConnection extends EventTarget {
     const s=this.current;
     const summary=s?`Firmware: ${s.identity}\nConfirmed buffer: ${s.buffer} samples at ${s.sampleRate} Hz\nBuffer scope: ${s.globalBuffer?'Global · saved on plug':'Per preset'}${s.bufferStorageError?' · storage error':''}\nActive color index: ${s.active}; capture CRC: ${s.modelCrc}; faults: ${s.faults}\nOutput: ${s.listening?'on':'muted'}; settling: ${s.settling}\nLive stock effects: ${s.effects.join(',')}\nLive FX A/B: ${s.fx?.join(',')??'unavailable'}\n`:'';
     const codec=s?.codec?`Converter startup: ${s.codec.verified?'short-delay setting verified':'setting unverified'}; ${s.codec.raw.toString(16)}\n`:'';
-    return `mighty-nam controller 0.8.8\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `mighty-nam controller 0.9.0\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
-  async connect() {
+  async reconnect(){
+    if(!this.lastDevice)throw new Error('Tap Connect to choose the plug again.');
+    return this.connect(this.lastDevice);
+  }
+  async connect(remembered=null) {
     if (this.busy || this.connected) throw new Error('A connection is already active.');
     if (!this.bluetooth?.requestDevice) throw new Error('Open this page in Bluefy on iPhone.');
     this.busy = true; const epoch = ++this.epoch;
@@ -50,11 +54,11 @@ export class PlugConnection extends EventTarget {
     this.writeMethod = null; this.lastWrite = 0;
     try {
       this.progress('Choose your Mighty Plug Pro');
-      const device = await this.bluetooth.requestDevice({
+      const device = remembered ?? await this.bluetooth.requestDevice({
         filters: [{ namePrefix: 'MIGHTY PLUG PRO' }, { namePrefix: 'Mighty Plug Pro' }],
         optionalServices: [MIDI_SERVICE]
       });
-      this.assertSession(epoch); this.device = device;
+      this.assertSession(epoch); this.device = device; this.lastDevice = device;
       device.addEventListener('gattserverdisconnected', this.onLost);
       this.progress('Opening Bluetooth connection');
       const server = await device.gatt.connect();
@@ -82,7 +86,7 @@ export class PlugConnection extends EventTarget {
     } finally { if (epoch === this.epoch) this.busy = false; }
   }
   close(log = true) {
-    if (log) this.record('Disconnected by page');
+    if (log) {this.record('Disconnected by page');this.lastDevice=null;}
     this.epoch++; this.busy = false; this.ready = false; this.writeStalled = false;
     this.current = null;
     if (this.pending) this.pending.reject(new Error('Connection closed.'));
@@ -135,7 +139,7 @@ export class PlugConnection extends EventTarget {
   }
   async request(message, parse, label = 'Status read', { mutation = false, timeout = this.timeout } = {}) {
     if (!allowedCommand(message, mutation, this.current)) throw new Error('Unsupported command; nothing sent.');
-    if (mutation && !['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(this.current?.identity)) throw new Error('Read and verify supported firmware before editing.');
+    if (mutation && !['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(this.current?.identity)) throw new Error('Read and verify supported firmware before editing.');
     if (!this.connected) throw new Error('Plug disconnected.');
     if (this.pending) throw new Error('A read is already in progress.');
     if (this.writeStalled) throw new Error('A Bluetooth write did not finish. Disconnect and reconnect before retrying.');
@@ -192,18 +196,18 @@ export class PlugConnection extends EventTarget {
   async snapshot() {
     const identity = await this.request(IDENTITY_REQUEST, parseIdentity, 'Reading firmware identity');
     this.record(`Identity: ${identity}`);
-    if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(identity)) throw new Error(`The plug reports ${identity}. This controller needs NAMLNK12 or later supported firmware.`);
+    if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(identity)) throw new Error(`The plug reports ${identity}. This controller needs NAMLNK12 or later supported firmware.`);
     const words = [];
     for (const page of [0, 1, 2, 4, 5, 9, 10, 23, 24, 25]) words[page] = await this.readPage(page);
     const chain = await this.request(CHAIN_REQUEST, chainParser(), 'Reading signal chain');
     if (await this.readPage(25) !== words[25] || await this.readPage(5) !== words[5])
       throw new Error('The preset changed while reading. Refresh to read it again.');
     const state = decodeSnapshot(words, chain, identity); validateEffects(state.effects,identity);
-    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(identity)){
+    if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(identity)){
       const wire=fxRequest(0,state.active,1);const result=await this.request(wire,m=>fxReply(m,wire),'Reading FX blocks');
       if(result.error||result.active!==state.active)throw new Error('FX snapshot changed. Refresh the plug.');state.fx=result.config;
     }
-    if(['NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27'].includes(identity)) {
+    if(['NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(identity)) {
       state.codec=decodeCodecStatus(await this.readPage(117));
       this.record(`Converter startup: ${state.codec.verified?'short-delay setting verified':'setting unverified'}; ${state.codec.raw.toString(16)}`);
     }

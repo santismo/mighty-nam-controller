@@ -18,6 +18,6 @@ test('NAMLNK25 both Auto Wah slots edit and recall without changing playback or 
   await editor.save(state,state.effects,8,'Auto Wah');await editor.recall(2);state=await editor.recall(0);
   assert.deepEqual(state.fx,fx);assert.equal(state.listening,true);
   assert.equal(fake.requests.some(q=>q[7]===65),false,'No output command');
-  assert.equal(fake.requests.some(q=>q[6]===78&&q[7]===79),false,'No looper command');
+  assert.equal(fake.requests.some(q=>q[6]===78&&q[7]===79&&q[9]!==0),false,'No looper mutation');
  } finally {link.close();}
 });
