@@ -39,3 +39,5 @@ body{background:#050505}.topbar{height:76px}.brand{font-size:19px;letter-spacing
 .block{flex:0 0 100px}.chain{gap:12px}#add-block{margin:12px 26px 0;min-height:36px;width:fit-content;font-size:12px}
 
 .move-controls .secondary-button{font-size:12px;font-weight:500;min-width:0;padding:0 12px;white-space:nowrap}
+
+.looper-panel{padding:22px;margin:22px 0;--accent:#7ce4bd}.looper-panel[hidden]{display:none}.looper-panel h2{font-size:18px;font-weight:400}.loop-readout{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px;font-size:14px}.loop-readout strong{font-weight:400;color:#7ce4bd}.loop-readout span{color:var(--muted);font-variant-numeric:tabular-nums}.loop-transport,.loop-options{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:16px 0}.looper-panel .secondary-button{margin:0}.loop-options label{font-size:12px;color:var(--muted)}.loop-options select{margin-left:8px}.looper-panel .parameters{padding:0}.loop-readout .armed{animation:loop-armed 1s steps(2,end) infinite}@keyframes loop-armed{50%{opacity:.35}}@media(prefers-reduced-motion:reduce){.loop-readout .armed{animation:none}}

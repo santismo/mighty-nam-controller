@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.5) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.8.6) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -10,7 +10,7 @@ A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open
 - Tap a block symbol or its **Enabled / Bypassed** badge to toggle processing. Bypass retains the tile and settings. **Remove** and **Change block** are separate actions; drag or use arrows to reorder.
 - **FX A / FX B** each offer Pitch, Auto Wah, Chorus, Flanger, Phaser, Tremolo and Vibrato. Pitch spans −12 to +12 semitones and is intended for single notes.
 - **High / Low Cut** provides independent adjustable filters, each with Off.
-- **Master volume** controls the plug. On NAMLNK21–25, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
+- **Master volume** controls the plug. On NAMLNK21–26, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
 - Choose an **8 / 16 / 32-sample** output buffer. NAMLNK18+ saves it globally. This is not a measurement of total guitar latency; time-based effects can add their own delay.
 - Open **Tuner**, pluck one string, and let it ring. The plug measures the input; the page polls over Bluetooth. No microphone or browser audio playback is used.
 
@@ -29,9 +29,15 @@ The integration uses OAuth picker flows and bounded favorites/downloaded/created
 
 ## Compatibility and status
 
-Controller **0.8.5** recognizes the NAMLNK25 looper RAM/timing trial and retains support for earlier builds. **FX A / FX B → Auto Wah** uses the improved Daisy-derived algorithm on NAMLNK24/25. **Drive → Touch Wah** offers Type, Wow, Sense, Direction and Level on both versions. The controller does not install firmware. Capture transfer, both wah choices, NAM controls, USB recording gain, tuner, presets and global buffering have offline protocol coverage. Connection/status reads do not change playback.
+Controller **0.8.6** recognizes NAMLNK25 and NAMLNK26 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–26; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
-NAMLNK25 remains a diagnostic looper trial: recording controls and the new POWER/PRESET gestures are not exposed by this page. Preset switching remains available. Firmware refuses preset saves while a loop exists; stop and clear the loop with the diagnostic tool before saving. Hardware loop recording/playback and worst-case timing still need testing.
+## Looper
+
+On **NAMLNK26**, open **Looper** for Arm, Finish/Pause/Play, Overdub/Finish layer, Stop, Clear, trigger threshold and loop level. **Looper controls / Preset controls** changes the hardware button mode. Selecting another preset leaves the loop/layer running. Opening or closing the panel does not stop playback. NAMLNK25 has basic transport only; settings, layers and button gestures need NAMLNK26.
+
+Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. Overdubs merge into one mono loop without undo. Settings and audio are lost on power-off. Clear the loop before saving presets to flash.
+
+The NAMLNK25 owner confirmed loop recording/playback through preset changes. NAMLNK26 layers, long mode and new physical gestures have offline coverage and still need their hardware trial. These development versions are not included in the public NAMLNK23 builder. [Implementation and button guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
 
 | Firmware | Available features |
 | --- | --- |
@@ -41,9 +47,10 @@ NAMLNK25 remains a diagnostic looper trial: recording controls and the new POWER
 | NAMLNK15+ | Compact automatic tuner |
 | NAMLNK18+ | Global persistent buffer |
 | NAMLNK20+ | Active chain with Add / Remove / Change block |
-| NAMLNK21–25 | NAM tone/mix/gain and independent USB recording gain |
-| NAMLNK24–25 | Retained stock Touch Wah; Daisy-derived Auto Wah in FX A/B |
-| NAMLNK25 | Existing editing supported; diagnostic looper operated separately |
+| NAMLNK21–26 | NAM tone/mix/gain and independent USB recording gain |
+| NAMLNK24–26 | Retained stock Touch Wah; Daisy-derived Auto Wah in FX A/B |
+| NAMLNK25 | Basic looper transport |
+| NAMLNK26 | Threshold/level, 30/60 s choice, merged overdubs and hardware control mode |
 
 Only explicitly recognized firmware identities are enabled. Automated protocol/browser tests use simulated Bluetooth; they do not establish physical iPhone transfer speed or all effects' real-time headroom. No firmware images are distributed here.
 
@@ -57,6 +64,6 @@ Original source: **MIT © 2026 santismo**. Mightier Amp notices are retained. NU
 
 ## Firmware compatibility
 
-NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/builder.html). The two wah choices are available in the NAMLNK24/25 test firmware. Reverse preset-cycling and new POWER/PRESET looper gestures remain under development.
+NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/builder.html). The two wah choices are available in the NAMLNK24/25/26 test firmware. Reverse preset-cycling and new POWER/PRESET looper gestures remain under development.
 
-The planned looper uses single POWER to switch between preset and loop controls, PRESET to arm/finish/pause/resume, and double POWER to stop and exit. See the [offline control tests and memory investigation](https://github.com/santismo/mighty-nam/blob/main/docs/looper-research.md); this is not part of controller 0.8.5.
+The planned looper uses single POWER to switch between preset and loop controls, PRESET to arm/finish/pause/resume, and double POWER to stop and exit. See the [offline control tests and memory investigation](https://github.com/santismo/mighty-nam/blob/main/docs/looper-research.md); this is not part of controller 0.8.6.
