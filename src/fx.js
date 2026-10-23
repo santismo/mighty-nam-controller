@@ -1,4 +1,4 @@
-import { same } from './controls.js?v=0.8.4';
+import { same } from './controls.js?v=0.8.5';
 const PREFIX=[240,67,88,112,4,2,78,70,1];
 export const FX_MODES=['Pitch','Auto Wah','Chorus','Flanger','Phaser','Tremolo','Vibrato'];
 export function defaultFx(){const c=Array(32).fill(0);for(let j=0;j<2;j++){const i=j*16;c[i]=j+1;c[i+2]=j+2;c[i+3]=12;c[i+4]=100;c[i+5]=30;c[i+6]=c[i+8]=c[i+9]=50;}return c;}
@@ -14,7 +14,7 @@ export function fxReply(m,request){
 }
 export function isFxRequest(m,mutation,current){
  if(!same(m.slice(0,9),PREFIX)||m.at(-1)!==247)return false;
- try{const op=m[9];if(op===1&&(!mutation||!['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(current?.identity)))return false;
+ try{const op=m[9];if(op===1&&(!mutation||!['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25'].includes(current?.identity)))return false;
  const model=op===1?m.slice(14,19).reduce((n,x,i)=>n+x*2**(7*i),0):0;
  return same(m,fxRequest(op,m[10]===127?255:m[10],m[11]+128*m[12],op===1?m.slice(19,-1):null,model))&&(op!==1||model===current.modelCrc&&(m[10]===127?255:m[10])===current.active);
  }catch{return false;}

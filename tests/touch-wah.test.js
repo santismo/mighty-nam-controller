@@ -5,8 +5,8 @@ import {allowedCommand} from '../src/commands.js';
 import {PlugConnection} from '../src/device.js';
 import {PlugEditor} from '../src/editor.js';
 import {editingBluetooth} from './editor-fixture.js';
-test('NAMLNK24 Touch Wah edits, saves, recalls and preserves both custom FX slots',async()=>{
- const fake=editingBluetooth({identity:'NAMLNK24'}),link=new PlugConnection(fake.bluetooth,1500,0,0),editor=new PlugEditor(link);
+for(const identity of ['NAMLNK24','NAMLNK25']) test(`${identity} Touch Wah edits, saves, recalls and preserves both custom FX slots`,async()=>{
+ const fake=editingBluetooth({identity}),link=new PlugConnection(fake.bluetooth,1500,0,0),editor=new PlugEditor(link);
  await link.connect();await editor.readBank();const original=link.current;
  const effects=changeType(original.effects,2,14,original.identity);effects[2]=14;
  assert.deepEqual(effects.slice(20,25),[1,35,90,0,100]);

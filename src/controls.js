@@ -1,6 +1,6 @@
-import { catalog } from './catalog.js?v=0.8.4';
+import { catalog } from './catalog.js?v=0.8.5';
 export { catalog };
-export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(identity);
+export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25'].includes(identity);
 const cutLabel=(v,high)=>{if(v===0)return 'Off';const hz=(high?1000:20)*Math.pow(high?20:50,(v-1)/99);return hz>=1000?`${(hz/1000).toFixed(2)} kHz`:`${Math.round(hz)} Hz`;};
 const cutEq={id:4,name:'High / Low Cut',parameters:[false,true].map((high,i)=>({name:high?'High Cut':'Low Cut',cc:31+i,index:36+i,default:0,labels:Array.from({length:101},(_,v)=>cutLabel(v,high))}))};
 const touchWah={id:14,name:'Touch Wah',parameters:[
@@ -10,8 +10,8 @@ const touchWah={id:14,name:'Touch Wah',parameters:[
  {name:'Direction',cc:20,index:23,default:0,labels:['Down','Up']},
  {name:'Level',cc:21,index:24,default:100}
 ]};
-export const effectChoices=(id,identity)=>id===2&&identity==='NAMLNK24'?[...catalog[id],touchWah]:id===4&&hasCutEq(identity)?[...catalog[id],cutEq]:catalog[id]??[];
-export const maxType=(id,identity)=>id==2&&identity==='NAMLNK24'?14:id==4&&hasCutEq(identity)?4:MAX_TYPES[id];
+export const effectChoices=(id,identity)=>id===2&&['NAMLNK24','NAMLNK25'].includes(identity)?[...catalog[id],touchWah]:id===4&&hasCutEq(identity)?[...catalog[id],cutEq]:catalog[id]??[];
+export const maxType=(id,identity)=>id==2&&['NAMLNK24','NAMLNK25'].includes(identity)?14:id==4&&hasCutEq(identity)?4:MAX_TYPES[id];
 export const COLORS = ['Green', 'Orange', 'Red', 'Blue', 'Cyan', 'Pink', 'Lilac'];
 export const RANGES = [[13,16,15],[17,22,20],[31,42,36],[43,46,49],[47,52,54],[53,60,61],[61,64,70],[65,70,75]];
 export const MAX_TYPES = {1:3,2:13,4:2,5:1,6:13,7:5,8:6,9:34};
@@ -42,7 +42,7 @@ export function editPlan(before,after,identity=null) {
   if((before[3]&63)!==(after[3]&63)) throw new Error('The NAM capture cannot be changed with an effect command.');
   const allowed=new Set([84,1,2,3,4,5,6,7,8,9,...Array.from({length:9},(_,i)=>90+i)]), messages=[];
   for(const [first,last] of RANGES) for(let cc=first;cc<=last;cc++) allowed.add(parameterIndex(cc));
-  if(['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24'].includes(identity))for(let i=27;i<=35;i++)allowed.add(i);
+  if(['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25'].includes(identity))for(let i=27;i<=35;i++)allowed.add(i);
   if(before.some((v,i)=>v!==after[i]&&!allowed.has(i))) throw new Error('An unrelated setting changed.');
   if(before[84]!==after[84])messages.push([176,73,after[84]]);
   for(let id=1;id<=9;id++) if(before[id]!==after[id]) messages.push([176,id,after[id]]);
