@@ -1,6 +1,6 @@
-import {TonePicker} from './tone-picker.js?v=0.10.0';
-import { ToneClient, safeImage } from './tone3000.js?v=0.10.0';
-import { CaptureLibrary, parseModel } from './model.js?v=0.10.0';
+import {TonePicker} from './tone-picker.js?v=0.10.1';
+import { ToneClient, safeImage } from './tone3000.js?v=0.10.1';
+import { CaptureLibrary, parseModel } from './model.js?v=0.10.1';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,fn,cls='secondary-button')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};

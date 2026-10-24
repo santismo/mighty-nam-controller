@@ -1,4 +1,4 @@
-import { catalog } from './catalog.js?v=0.10.0';
+import { catalog } from './catalog.js?v=0.10.1';
 export { catalog };
 export const hasCutEq=identity=>['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity);
 const cutLabel=(v,high)=>{if(v===0)return 'Off';const hz=(high?1000:20)*Math.pow(high?20:50,(v-1)/99);return hz>=1000?`${(hz/1000).toFixed(2)} kHz`:`${Math.round(hz)} Hz`;};

@@ -102,3 +102,15 @@ test('NAMLNK29 explicit Start cannot invert a newer physical overdub state',asyn
  panel.loop={read:async()=>panel.state,change:async(...args)=>{calls.push(args);return {...panel.state,overdub:true};}};
  await panel.overdub();assert.deepEqual(calls,[[1,13]]);
 });
+
+test('older firmware retains transport without lane controls or incorrect gestures',t=>{
+ const {panel,state,get}=setup(t);
+ panel.state={...state,state:3,length:24000,extended:false,saveSupported:false,peak:null};panel.render();
+ assert.equal(get('loop-toggle').disabled,false);assert.equal(get('loop-takes').hidden,true);
+ assert.equal(get('loop-threshold').disabled,true);assert.equal(get('loop-save').disabled,true);
+ assert.match(get('loop-gestures').textContent,/NAMLNK25.*gestures are unavailable/);
+ panel.state={...state,state:3,length:24000,saveSupported:true};panel.render();
+ assert.equal(get('loop-overdub').disabled,false);assert.equal(get('loop-takes').hidden,true);
+ assert.match(get('loop-compatibility').textContent,/Merged overdubs.*NAMLNK29/);
+ assert.match(get('loop-gestures').textContent,/hold previous/);
+});

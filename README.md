@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.10.0) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.10.1) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -60,15 +60,15 @@ sets Looper mode so PRESET can finish the recording.
 
 ## Compatibility and status
 
-Controller **0.10.0** recognizes NAMLNK25–29 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
+Controller **0.10.1** recognizes NAMLNK12–29 and retains each version’s supported controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–29; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
 ## Looper
 
 On **NAMLNK26–28**, open **Looper** for Arm, Finish/Pause/Play, **Start overdub / Finish overdub**, Stop, **Mute loop**, **Delete loop**, trigger threshold and combined-loop volume. Controller **0.9.1** highlights active overdubbing and shows the confirmed loop cursor moving through the recording. Finish overdub keeps the take and continues playback; ordinary playback does not add guitar. Mute restores the last nonzero volume observed during this connection. It affects the entire loop and does not finish an overdub. Delete loop removes the entire recording after confirmation. **Looper controls / Preset controls** changes the hardware button mode. Selecting another preset leaves the loop/layer running. Opening or closing the panel does not stop playback. NAMLNK25 has basic transport only; settings, layers and button gestures need NAMLNK26.
 
-Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. On NAMLNK26–28, overdubs merge into one mono loop without undo; separate lanes require NAMLNK29. The moving bar is loop position, not audio volume; the existing input meter is live guitar. Overdubbing continues across as many loop passes as you play until Finish overdub; it does not stop automatically after one revolution. This controller does not add a timer that could fail while the browser is suspended. Loops are lost on power-off. On NAMLNK28, clear the retained loop and choose **Save looper settings** to retain threshold, level and duration. Live edits alone are not saved. New settings default to −50 dB and 100% level; lower levels are supported. Older firmware settings are volatile. Clear the loop before saving presets to flash.
+Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. On NAMLNK26–28, overdubs merge into one mono loop without undo; separate lanes require NAMLNK29. The moving bar is loop position, not audio volume; the existing input meter is live guitar. Overdubbing continues across as many loop passes as you play until Finish overdub; it does not stop automatically after one revolution. This controller does not add a timer that could fail while the browser is suspended. Loops are lost on power-off. On NAMLNK28–29, clear the retained loop and choose **Save looper settings** to retain threshold, level and duration. Live edits alone are not saved. New settings default to −50 dB and 100% level; lower levels are supported. Older firmware settings are volatile. Clear the loop before saving presets to flash.
 
-The NAMLNK25 owner confirmed loop recording/playback through preset changes. The owner tested NAMLNK26 phone transport, but reported scratchy 30-second overdubs and missed physical PRESET finishes. NAMLNK27 fixes have offline coverage and need a new hardware/listening check. The latest local builder now offers the NAMLNK28 preview with licensed starters; exact hardware validation remains pending. [Implementation and button guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
+The NAMLNK25 owner confirmed loop recording/playback through preset changes. The owner tested NAMLNK26 phone transport, but reported scratchy 30-second overdubs and missed physical PRESET finishes. NAMLNK27 fixes have offline coverage and need a new hardware/listening check. The latest local builder offers NAMLNK29, NAMLNK28 and NAMLNK23 r2 with licensed starters; exact hardware validation remains pending. [Implementation and button guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
 
 | Firmware | Available features |
 | --- | --- |
@@ -86,7 +86,7 @@ The NAMLNK25 owner confirmed loop recording/playback through preset changes. The
 | NAMLNK29 preview | Independent reusable overdub lanes, one-edit undo/redo and seven-slot save refresh fix |
 | NAMLNK28 | Explicit saved looper settings, 100% level default, hold overdub, tap-then-hold clear, single backward preset |
 
-Only explicitly recognized firmware identities are enabled. Automated protocol/browser tests use simulated Bluetooth; they do not establish physical iPhone transfer speed or all effects' real-time headroom. No firmware images are distributed here.
+The current page works with explicitly recognized NAMLNK12–29 firmware. It reads the identity on every connection and enables only that version’s commands. No firmware update is required to continue using older features. NAMLNK25 has transport only, NAMLNK26–28 retain merged overdubs, and only NAMLNK29 gets independent lanes and undo. Unknown identities remain rejected. Automated protocol/browser tests use simulated Bluetooth; they do not establish physical iPhone transfer speed or all effects' real-time headroom. No firmware images are distributed here.
 
 ## Development and rights
 
@@ -98,7 +98,7 @@ Original source: **MIT © 2026 santismo**. Mightier Amp notices are retained. NU
 
 ## Firmware compatibility
 
-NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/looper-builder.html). The two wah choices are available in the NAMLNK24–29 test firmware. The latest local builder includes the experimental NAMLNK28 looper.
+NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/looper-builder.html). The two wah choices are available in the NAMLNK24–29 test firmware. The latest local builder lets you select NAMLNK29, NAMLNK28 or NAMLNK23 r2. Choose Firmware at the bottom of the controller to open it; updating is optional and uses the NUX desktop updater, never Bluetooth.
 
 The development looper uses single POWER to switch between preset and loop controls, PRESET to arm/finish/pause/resume, and double POWER to stop and exit. See the [button and storage guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
 

@@ -1,4 +1,4 @@
-import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.10.0';
+import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.10.1';
 // A nonmodal panel lets guitar preset selection remain available between polls.
 // Shares the app's busy gate: no poll runs concurrently with a preset/model edit.
 // Avoid rewriting unchanged controls on each meter poll. WebKit visibly
@@ -172,7 +172,7 @@ export class LooperPanel {
     put(this.get('loop-control-state'),'textContent',s?.extended?`Buttons: ${s.mode?'Looper':'Presets'}${s.saveSupported?'':` · Preset order: ${s.reverse?'Reverse':'Forward'}`}`:'');
     put(this.get('loop-save'),'disabled',disabled||!s?.saveSupported||s.state!==0||s.length>0||s.saved&&!this.settings.size);
     put(this.get('loop-save-state'),'textContent',!s?.saveSupported?'Saving settings needs NAMLNK28':s.state!==0||s.length>0?'Clear the loop before saving settings':s.saved?'Saved on plug':'Live · not saved');
-    put(this.get('loop-gestures'),'textContent',s?.saveSupported?'PRESET: tap next preset; hold previous. In Looper: tap to arm, finish, pause or play; hold to toggle overdub; tap then hold within 300 ms to clear. POWER: double tap enters Looper, or stops and exits; single tap switches between loop and preset controls. Hold POWER to turn off.': 'PRESET: tap next preset; hold reverses preset direction. In Looper: tap to arm, finish, pause or play; hold to clear. POWER: double tap enters Looper, or stops and exits; single tap switches between loop and preset controls. Overdub uses the on-screen button. Hold POWER to turn off.');
+    put(this.get('loop-gestures'),'textContent',!s?.extended?'NAMLNK25: PRESET changes guitar presets. Use this page to arm, finish, pause and play the loop; the later looper button gestures are unavailable. Hold POWER to turn off.':s?.saveSupported?'PRESET: tap next preset; hold previous. In Looper: tap to arm, finish, pause or play; hold to toggle overdub; tap then hold within 300 ms to clear. POWER: double tap enters Looper, or stops and exits; single tap switches between loop and preset controls. Hold POWER to turn off.': 'PRESET: tap next preset; hold reverses preset direction. In Looper: tap to arm, finish, pause or play; hold to clear. POWER: double tap enters Looper, or stops and exits; single tap switches between loop and preset controls. Overdub uses the on-screen button. Hold POWER to turn off.');
     for(const [id,op,key] of [['loop-threshold',2,'threshold'],['loop-volume',3,'volume'],['loop-duration',4,'seconds']]){
       const field=this.get(id);
       put(field,'disabled',disabled||!s?.extended||(id==='loop-duration'&&s?.state!==0));
@@ -180,6 +180,7 @@ export class LooperPanel {
     }
     this.renderTakes(s,disabled);
     this.labels();
-    this.get('loop-compatibility').hidden=Boolean(s?.extended);
+    put(this.get('loop-compatibility'),'hidden',!s||Boolean(s.takes));
+    put(this.get('loop-compatibility'),'textContent',!s?.extended?'NAMLNK25 · transport only. Settings and overdubs require NAMLNK26 or later.':'Merged overdubs · independent lanes and undo need NAMLNK29.');
   }
 }
