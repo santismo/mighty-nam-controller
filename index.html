@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#050505">
   <meta name="referrer" content="no-referrer">
   <meta name="description" content="mighty-nam controller.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; connect-src 'self' https://www.tone3000.com https://api.tone3000.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; connect-src 'self' https://www.tone3000.com https://api.tone3000.com; frame-src 'self' https://www.tone3000.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>mighty-nam</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.png">
-  <link rel="stylesheet" href="./style.css?v=0.9.0">
-  <script type="module" src="./src/entry.js?v=0.9.0"></script>
+  <link rel="stylesheet" href="./style.css?v=0.9.1">
+  <script type="module" src="./src/entry.js?v=0.9.1"></script>
 </head>
 <body>
   <div class="shell">
@@ -58,20 +58,30 @@
       <section id="looper-panel" class="panel looper-panel" hidden aria-label="Looper">
         <div class="dialog-heading"><h2>Looper</h2><button id="close-looper" class="secondary-button">Close</button></div>
         <div class="loop-readout"><strong id="loop-state" role="status">Reading…</strong><span id="loop-time">—</span></div>
-        <div class="loop-transport"><button id="loop-arm" class="secondary-button">Arm</button><button id="loop-toggle" class="secondary-button">Play</button><button id="loop-overdub" class="secondary-button">Overdub</button><button id="loop-stop" class="secondary-button">Stop</button><button id="loop-clear" class="secondary-button">Clear</button></div>
+        <div class="loop-transport"><button id="loop-arm" class="secondary-button">Arm</button><button id="loop-toggle" class="secondary-button">Play</button><button id="loop-overdub" class="secondary-button" aria-pressed="false">● Start overdub</button><button id="loop-stop" class="secondary-button">Stop</button></div>
+        <p id="loop-recording-status" class="loop-recording-status" role="status">Overdub is off.</p>
+        <div class="loop-mix"><div class="loop-mix-heading"><strong>Combined loop</strong><span id="loop-mix-state">Empty</span></div><progress id="loop-position" max="1" value="0" aria-label="Loop playback position"></progress><small id="loop-position-label">No recorded loop</small><div class="loop-options"><button id="loop-mute" class="secondary-button" aria-pressed="false">Mute loop</button><button id="loop-clear" class="secondary-button">Delete loop</button></div></div>
         <div class="parameters">
           <label class="parameter" for="loop-threshold"><span>Trigger threshold <output id="loop-threshold-value">−40 dB</output></span><span id="loop-threshold-meter" class="threshold-meter"><input id="loop-threshold" type="range" min="-60" max="-12" value="-40" step="1" aria-describedby="loop-input-level"></span><small id="loop-input-level">Input —</small></label>
-          <label class="parameter" for="loop-volume"><span>Loop level <output id="loop-volume-value">50%</output></span><input id="loop-volume" type="range" min="0" max="100" value="50" step="1"></label>
+          <label class="parameter" for="loop-volume"><span>Combined loop volume <output id="loop-volume-value">50%</output></span><input id="loop-volume" type="range" min="0" max="100" value="50" step="1"></label>
         </div>
         <div class="loop-options"><label>Length <select id="loop-duration"><option value="30">30 s · 24 kHz</option><option value="60">60 s · 12 kHz</option></select></label><button id="loop-mode" class="secondary-button">Looper controls</button><button id="loop-refresh" class="secondary-button">Refresh loop</button></div>
-        <p class="secondary">Loops stay in memory until cleared or powered off. 60 s has reduced bandwidth. Overdubs merge into the loop.</p>
+        <p class="secondary">Finish overdub stops adding guitar; the loop keeps playing. Mute affects the combined loop and does not stop recording. Overdubs merge into one recording: separate take mute, volume, delete and audio meters need new firmware. The moving bar shows loop position; the input meter shows your live guitar.</p>
+        <p class="secondary">Loops stay in memory until deleted or powered off. 60 s has reduced bandwidth.</p>
         <p id="loop-compatibility" class="secondary">Level, threshold and overdub controls need the next looper firmware.</p><p id="loop-control-state" class="secondary"></p>
 <div class="loop-options"><button class="secondary-button" id="loop-save" type="button">Save looper settings</button><span class="secondary" id="loop-save-state"></span></div><details><summary>Plug buttons</summary><p class="secondary" id="loop-gestures"></p></details><p id="loop-error" class="message error" role="alert"></p>
       </section>
       <dialog id="tone-dialog" class="tone-dialog"><div class="dialog-heading"><div><h2>Captures</h2><a class="tone-credit" href="https://www.tone3000.com" target="_blank" rel="noopener noreferrer"><span>Powered by</span> <img src="assets/tone3000.svg" alt="TONE3000" width="100" height="23" style="vertical-align:middle"> ↗</a></div><button id="close-tones" class="secondary-button">Close</button></div>
-        <div class="tone-toolbar"><button id="tone-catalog" class="primary">Browse TONE3000 ↗</button><span id="tone-account"></span><button id="tone-signout" class="secondary-button" hidden>Sign out</button></div>
+        <div id="tone-toolbar" class="tone-toolbar"><button id="tone-catalog" class="primary">Browse TONE3000</button><span id="tone-account"></span><button id="tone-signout" class="secondary-button" hidden>Sign out</button></div>
+        <p id="tone-message" class="message" role="status" aria-live="polite"></p>
+        <section id="tone-picker" hidden aria-label="TONE3000 browser">
+          <div class="tone-picker-controls"><button id="tone-picker-back" class="secondary-button">← Back to captures</button><details><summary>Sign-in help</summary><p>Sign in here to connect TONE3000 to this controller. A login in another Bluefy tab may not carry into this panel.</p><p>If the panel stays blank or sign-in keeps restarting, continue in this tab and return automatically after selecting a tone. Bluetooth will need reconnecting.</p><button id="tone-picker-fallback" class="secondary-button">Continue in this tab</button></details></div>
+          <iframe id="tone-picker-frame" title="Browse and sign in to TONE3000" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+        </section>
+        <div id="tone-library">
         <div class="tone-filters"><select id="tone-collection" aria-label="Capture collection"><option value="local">On this phone</option><option value="favorites">Phone favorites</option><option value="favorited">TONE3000 favorites</option><option value="downloaded">TONE3000 downloads</option><option value="created">My TONE3000 captures</option><option value="trending">Trending</option><option value="latest">Latest</option></select><select id="tone-gear" aria-label="Gear type"><option value="">All gear</option><option value="amp-cab">Amp + cabinet</option><option value="amp">Amp head</option><option value="pedal">Pedal</option><option value="cab">Cabinet</option><option value="outboard">Outboard</option></select></div>
-        <input id="tone-local-search" type="search" aria-label="Find a phone capture" placeholder="Find a phone capture"><p id="tone-message" class="message" role="status" aria-live="polite"></p><button id="tone-back" class="secondary-button" hidden>← Back to collection</button><div id="tone-content" class="tone-content"></div><button id="tone-more" class="secondary-button" hidden>More</button>
+        <input id="tone-local-search" type="search" aria-label="Find a phone capture" placeholder="Find a phone capture"><button id="tone-back" class="secondary-button" hidden>← Back to collection</button><div id="tone-content" class="tone-content"></div><button id="tone-more" class="secondary-button" hidden>More</button>
+        </div>
       </dialog>
       <dialog id="save-dialog"><div class="dialog-heading"><h2>Save capture to plug</h2><button id="close-save" class="secondary-button">Close</button></div><p class="secondary"></p><label for="save-color" class="eyebrow">Preset color</label><select id="save-color" aria-label="Save to preset color"></select><p id="save-destination" class="secondary"></p><button id="confirm-save" class="primary">Save to this color</button></dialog>
       <dialog id="add-block-dialog"><div class="dialog-heading"><h2 id="add-block-heading">Add block</h2><button id="close-add-block" class="secondary-button">Close</button></div><div id="add-block-list" class="effect-list"></div></dialog>
@@ -79,7 +89,7 @@
       <dialog id="tuner-dialog"><div class="dialog-heading"><h2>Tuner</h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
     </main>
   <footer style="text-align:center;padding:20px;color:#8c929c;font-size:12px"><a href="https://santismo.github.io/mighty-nam/phone.html">Guide</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/LEGAL.md">Legal</a></footer>
-    <footer><span id="version">0.9.0</span><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
+    <footer><span id="version">0.9.1</span><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
     <noscript>Enable JavaScript to connect.</noscript>
   </div>
 </body>

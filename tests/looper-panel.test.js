@@ -62,3 +62,31 @@ test('unchanged transport status never flips disabled buttons or replaces their 
   assert.deepEqual(changes,[]);assert.deepEqual(locks,[]);
   assert.equal(get('loop-arm').disabled,true);assert.equal(get('loop-toggle').disabled,false);
 });
+
+test('finish overdub does not restart recording if a physical button has already finished it',async t=>{
+ const {panel,state}=setup(t),calls=[];
+ panel.state={...state,state:3,length:24000,cursor:12000,overdub:true};
+ panel.loop={read:async()=>({...panel.state,overdub:false}),change:async(...args)=>{calls.push(args);return panel.state;}};
+ await panel.overdub();assert.deepEqual(calls,[]);assert.equal(panel.state.overdub,false);
+});
+test('overdub reads the plug first and writes only once; failure never retries a toggle',async t=>{
+ const {panel,state}=setup(t),calls=[];
+ panel.state={...state,state:3,length:24000,overdub:false};
+ panel.loop={read:async()=>({...panel.state}),change:async(op,arg)=>{calls.push([op,arg]);throw new Error('Lost reply');}};
+ await panel.overdub();assert.deepEqual(calls,[[1,6]]);assert.equal(panel.state,null);
+ await panel.overdub();assert.equal(calls.length,1);
+});
+test('combined-loop mute preserves the last confirmed audible level and clears queued volume edits',async t=>{
+ const {panel,state,get}=setup(t),calls=[];let device={...state,state:3,length:24000,cursor:12000,volume:65,overdub:false};
+ panel.loop={read:async()=>device,change:async(op,arg)=>{calls.push([op,arg]);device={...device,volume:arg};return device;}};
+ await panel.run();clearTimeout(panel.timer);panel.settings.set(3,85);
+ await panel.mute();clearTimeout(panel.timer);assert.equal(panel.settings.has(3),false);assert.equal(get('loop-mute').textContent,'Unmute loop');assert.equal(get('loop-mix-state').textContent,'Muted');
+ await panel.mute();assert.deepEqual(calls,[[3,0],[3,65]]);assert.equal(panel.state.volume,65);assert.equal(panel.state.state,3);assert.equal(panel.state.overdub,false);
+});
+test('loop position and recording status describe confirmed state rather than simulated layer levels',t=>{
+ const {panel,state,get}=setup(t);panel.state={...state,state:3,length:48000,cursor:12000,overdub:true};panel.render();
+ assert.equal(get('loop-position').max,48000);assert.equal(get('loop-position').value,12000);assert.match(get('loop-position-label').textContent,/0.5 \/ 2.0 s/);
+ assert.match(get('loop-recording-status').textContent,/every pass/);assert.match(get('loop-overdub').textContent,/Finish overdub/);
+ panel.state.overdub=false;panel.render();assert.match(get('loop-recording-status').textContent,/not being recorded/);assert.match(get('loop-overdub').textContent,/Start overdub/);
+ panel.state.extended=false;panel.render();assert.equal(get('loop-overdub').disabled,true);assert.equal(get('loop-mute').disabled,true);
+});

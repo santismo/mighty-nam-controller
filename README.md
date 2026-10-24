@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.9.0) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.9.1) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -22,8 +22,9 @@ Use one controller at a time. Refresh after using the physical PRESET button. Ra
 
 1. Open **Captures → Browse TONE3000**. Sign in, browse the official catalog, and select a tone.
 2. Choose **Load capture** for a supported **48 kHz A2 Lite** model. A Lite component inside an A2 file is supported; full A2 and other architectures are rejected.
-3. The picker opens in a separate tab, keeping the controller alive. Returning attempts to retain Bluetooth or reconnect the previously chosen device if iOS suspended it. Tap Connect only if that attempt fails. The selected capture becomes active only after transfer and checksum/readback confirmation. The Captures window stays open for continued browsing.
-4. Star captures to keep multiple phone favorites. **Save to plug** separately stores one in a chosen color. Amp-and-cab captures bypass the stock cabinet.
+3. The official picker opens **inside Captures**, keeping the controller page and its Bluetooth connection alive. Sign in inside that panel; an existing TONE3000 login in another Bluefy tab may not carry over. Selecting a tone returns to its model list here; **Load capture** downloads, validates and transfers the A2 Lite model. It becomes active only after checksum/readback confirmation.
+4. **Back to captures** cancels browsing. If the embedded panel stays blank or sign-in restarts, use **Sign-in help → Continue in this tab**. This explicit fallback returns automatically after selection; reconnect Bluetooth before loading. No popup is required. If iOS suspends Bluetooth during embedded browsing, the controller tries to reconnect the previously selected device.
+5. Star captures to keep multiple phone favorites. **Save to plug** separately stores one in a chosen color. Amp-and-cab captures bypass the stock cabinet.
 
 The integration uses OAuth picker flows and bounded favorites/downloaded/created/trending/latest feeds. Full search stays on TONE3000. Downloads are user-requested, with creator and license metadata retained. No catalog mirroring, private API key, proxy account or bundled captures. Clearing browser data removes local favorites/downloads, not onboard presets. Up to 64 selected captures are cached locally. Tokens remain in memory; reloading requires signing in through the picker again.
 
@@ -51,13 +52,13 @@ sets Looper mode so PRESET can finish the recording.
 
 ## Compatibility and status
 
-Controller **0.9.0** recognizes NAMLNK25–28 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
+Controller **0.9.1** recognizes NAMLNK25–28 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
 ## Looper
 
-On **NAMLNK26–28**, open **Looper** for Arm, Finish/Pause/Play, Overdub/Finish layer, Stop, Clear, trigger threshold and loop level. **Looper controls / Preset controls** changes the hardware button mode. Selecting another preset leaves the loop/layer running. Opening or closing the panel does not stop playback. NAMLNK25 has basic transport only; settings, layers and button gestures need NAMLNK26.
+On **NAMLNK26–28**, open **Looper** for Arm, Finish/Pause/Play, **Start overdub / Finish overdub**, Stop, **Mute loop**, **Delete loop**, trigger threshold and combined-loop volume. Controller **0.9.1** highlights active overdubbing and shows the confirmed loop cursor moving through the recording. Finish overdub keeps the take and continues playback; ordinary playback does not add guitar. Mute restores the last nonzero volume observed during this connection. It affects the entire loop and does not finish an overdub. Delete loop removes the entire recording after confirmation. **Looper controls / Preset controls** changes the hardware button mode. Selecting another preset leaves the loop/layer running. Opening or closing the panel does not stop playback. NAMLNK25 has basic transport only; settings, layers and button gestures need NAMLNK26.
 
-Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. Overdubs merge into one mono loop without undo. Loops are lost on power-off. On NAMLNK28, clear the retained loop and choose **Save looper settings** to retain threshold, level and duration. Live edits alone are not saved. New settings default to −50 dB and 100% level; lower levels are supported. Older firmware settings are volatile. Clear the loop before saving presets to flash.
+Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. Overdubs merge into one mono loop without undo. The phone cannot display or independently mute, delete, or meter separate takes because the firmware does not retain them. The moving bar is loop position, not audio volume; the existing input meter is live guitar. Independent layers and exact one-pass overdubbing require firmware support. This controller does not add a timer that could fail while the browser is suspended. Loops are lost on power-off. On NAMLNK28, clear the retained loop and choose **Save looper settings** to retain threshold, level and duration. Live edits alone are not saved. New settings default to −50 dB and 100% level; lower levels are supported. Older firmware settings are volatile. Clear the loop before saving presets to flash.
 
 The NAMLNK25 owner confirmed loop recording/playback through preset changes. The owner tested NAMLNK26 phone transport, but reported scratchy 30-second overdubs and missed physical PRESET finishes. NAMLNK27 fixes have offline coverage and need a new hardware/listening check. The latest local builder now offers the NAMLNK28 preview with licensed starters; exact hardware validation remains pending. [Implementation and button guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
 

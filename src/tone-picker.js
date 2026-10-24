@@ -1,42 +1,50 @@
-// Same-origin callback relay. The controller tab remains alive with its GATT
-// session. PKCE verification and one-use state validation stay in ToneClient.
+// Keep the controller and its Bluetooth connection alive underneath the picker.
+// Only the same-origin callback in this exact frame can hand a code back.
 export class TonePicker {
-  constructor({open=url=>window.open(url,'_blank'),channel=name=>new BroadcastChannel(name),returned,origin=location.origin}){Object.assign(this,{openWindow:open,makeChannel:channel,returned,origin});this.active=false;}
+  constructor({frame,returned,changed=()=>{},failed=()=>{},events=window,origin=location.origin,navigate=url=>location.assign(url)}){
+    Object.assign(this,{frame,returned,changed,failed,events,origin,navigate});this.active=false;this.generation=0;
+  }
   async open(authorize){
-    if(this.active)this.close();
-    // Must happen synchronously inside the original click, before WebCrypto.
-    const tab=this.openWindow('about:blank');
-    if(!tab)throw new Error('Allow a new tab in Bluefy, then tap Browse TONE3000 again.');
-    this.active=true;this.tab=tab;tab.name='mighty-nam-tone-picker';
-    // Safari may clear window.name across sites; sessionStorage restores this
-    // marker when the callback returns to our origin. It contains no tokens.
-    tab.sessionStorage?.setItem('mighty-nam-picker','1');
+    this.close();const generation=this.generation;this.active=true;this.changed(true);
     try{
       const url=new URL(await authorize()),state=url.searchParams.get('state');
-      if(!state||state.length>512)throw new Error('Invalid sign-in state.');
-      const channel=this.channel=this.makeChannel('mighty-nam-tone-'+state);
-      let consumed=false;
-      channel.onmessage=async event=>{
-        const value=event.data;if(consumed||value?.type!=='tone-return'||typeof value.url!=='string')return;
-        let callback;try{callback=new URL(value.url);}catch{return;}
+      if(generation!==this.generation)return;
+      if(url.origin!=='https://www.tone3000.com'||!state||state.length>512)throw new Error('Invalid sign-in address.');
+      this.url=url.href;let consumed=false;
+      this.listener=event=>{
+        if(consumed||event.origin!==this.origin||event.source!==this.frame.contentWindow||event.data?.type!=='tone-return'||typeof event.data.url!=='string')return;
+        let callback;try{callback=new URL(event.data.url);}catch{return;}
         if(callback.origin!==this.origin||callback.searchParams.get('state')!==state)return;
-        consumed=true;channel.postMessage({type:'tone-received'});
-        try{await this.returned(callback.href);}finally{this.close(false);}
+        consumed=true;
+        event.source.postMessage({type:'tone-received'},this.origin);
+        this.close();Promise.resolve().then(()=>this.returned(callback.href)).catch(this.failed);
       };
-      tab.location.href=url.href;
-      this.check=setTimeout(()=>this.close(false),600000);
-    }catch(error){this.close();throw error;}
+      this.events.addEventListener('message',this.listener);
+      this.frame.src=url.href;
+    }catch(error){if(generation===this.generation)this.close();throw error;}
   }
-  close(closeTab=true){clearInterval(this.check);this.channel?.close();if(closeTab)this.tab?.close();this.channel=null;this.tab=null;this.active=false;}
+  continueInTab(){const url=this.url;if(!url)return;this.close();this.navigate(url);}
+  close(){
+    this.generation++;this.events.removeEventListener('message',this.listener);this.listener=null;
+    this.frame.removeAttribute('src');this.url=null;this.active=false;this.changed(false);
+  }
 }
-// A callback tab must not instantiate the full controller or touch Bluetooth.
-export function relayToneCallback(url,{channel=name=>new BroadcastChannel(name),received=()=>window.close()}={}){
+
+// The callback frame must never instantiate a second controller. Keep the old
+// BroadcastChannel relay for a picker tab opened before this update.
+export function relayToneCallback(url,{target=window.parent!==window?window.parent:null,events=window,origin=location.origin,channel=name=>new BroadcastChannel(name),received=()=>{if(!target)window.close();}}={}){
   const callback=new URL(url),state=callback.searchParams.get('state');
-  if(!state||state.length>512)return null;
-  const port=channel('mighty-nam-tone-'+state);
-  let timer;
-  const send=()=>port.postMessage({type:'tone-return',url:callback.href});
-  port.onmessage=e=>{if(e.data?.type==='tone-received'){clearInterval(timer);port.close();received();}};
-  send();timer=setInterval(send,500);
-  return ()=>{clearInterval(timer);port.close();};
+  if(callback.origin!==origin||!state||state.length>512)return null;
+  let timer,timeout,port,listener;
+  const stop=()=>{clearInterval(timer);clearTimeout(timeout);port?.close();if(listener)events.removeEventListener('message',listener);};
+  const acknowledged=()=>{stop();received();};
+  const value={type:'tone-return',url:callback.href};
+  let send;
+  if(target){
+    listener=e=>{if(e.origin===origin&&e.source===target&&e.data?.type==='tone-received')acknowledged();};
+    events.addEventListener('message',listener);send=()=>target.postMessage(value,origin);
+  }else{
+    port=channel('mighty-nam-tone-'+state);port.onmessage=e=>{if(e.data?.type==='tone-received')acknowledged();};send=()=>port.postMessage(value);
+  }
+  timer=setInterval(send,500);timeout=setTimeout(stop,120000);send();return stop;
 }

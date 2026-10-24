@@ -1,6 +1,6 @@
-import {TonePicker} from './tone-picker.js?v=0.9.0';
-import { ToneClient, safeImage, toneURL } from './tone3000.js?v=0.9.0';
-import { CaptureLibrary, parseModel } from './model.js?v=0.9.0';
+import {TonePicker} from './tone-picker.js?v=0.9.1';
+import { ToneClient, safeImage } from './tone3000.js?v=0.9.1';
+import { CaptureLibrary, parseModel } from './model.js?v=0.9.1';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,fn,cls='secondary-button')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};
@@ -18,7 +18,12 @@ export function captureCard(tone,modelName=null){
 export class ToneBrowser {
   constructor({onSelect,onChange=()=>{},isBusy=()=>false,client=new ToneClient(),library=new CaptureLibrary(localStorage)}){
     Object.assign(this,{onSelect,onChange,isBusy,client,library});this.ticket=0;this.waiting=false;this.active=null;this.pending=null;this.view='local';
-    this.picker=new TonePicker({returned:url=>this.callback(url)});
+    this.picker=new TonePicker({frame:$('tone-picker-frame'),returned:url=>this.callback(url),failed:error=>this.say(error.message,true),changed:active=>{
+      $('tone-picker').hidden=!active;$('tone-library').hidden=active;$('tone-toolbar').hidden=active;$('tone-dialog').classList.toggle('picking',active);
+    }});
+    $('tone-picker-back').onclick=()=>{this.picker.close();this.say('Browse canceled.');};
+    $('tone-picker-fallback').onclick=()=>this.picker.continueInTab();
+    $('tone-dialog').addEventListener('close',()=>this.picker.close());
     $('open-captures').onclick=() =>this.open();$('nam-browse').onclick=()=>this.open();$('close-tones').onclick=()=>$('tone-dialog').close();
     $('tone-catalog').onclick=()=>this.authorize();$('tone-collection').onchange=()=>this.list();$('tone-gear').onchange=()=>this.list();$('tone-local-search').oninput=()=>{if(['local','favorites'].includes($('tone-collection').value))this.list();};
     $('tone-back').onclick=()=>this.list();$('tone-signout').onclick=()=>{this.ticket++;this.client.signOut();$('tone-account').replaceChildren();$('tone-collection').value='local';this.list();};
@@ -30,13 +35,15 @@ export class ToneBrowser {
   open(){if(!$('tone-dialog').open)$('tone-dialog').showModal();if(!this.waiting)this.list();}
   async authorize(toneId=null){
     if(this.waiting||this.isBusy())return;
-    await this.job('Opening TONE3000…',async()=>{const redirect=new URL('./',location.href);redirect.search='';redirect.hash='';await this.picker.open(()=>this.client.authorize(redirect.href,{toneId,gear:$('tone-gear').value}));this.say('Select a tone in the TONE3000 tab. Keep this controller tab open.');});
+    await this.job('Opening TONE3000…',async()=>{const redirect=new URL('./',location.href);redirect.search='';redirect.hash='';await this.picker.open(()=>this.client.authorize(redirect.href,{toneId,gear:$('tone-gear').value}));this.say('Sign in and select a tone below. Then choose Load capture to send an A2 Lite model to the plug.');});
   }
   async callback(url){
+    // A callback must not disappear if it arrives during a pending plug action.
+    if(this.waiting||this.isBusy()){clearTimeout(this.returnTimer);this.returnTimer=setTimeout(()=>this.callback(url),100);return;}
     if(!$('tone-dialog').open)$('tone-dialog').showModal();
     await this.job('Finishing TONE3000 sign-in…',async()=>{
       const id=await this.client.complete(url);
-      try{const user=await this.client.profile();$('tone-account').replaceChildren(creator(user));}catch{ $('tone-account').textContent='Signed in'; }
+      if(this.client.connected){try{const user=await this.client.profile();$('tone-account').replaceChildren(creator(user));}catch{ $('tone-account').textContent='Signed in'; }}
       if(id)await this.showTone(id);else{this.say('No tone selected. Browse again or choose a downloaded capture.');}
     });
   }
@@ -74,7 +81,7 @@ export class ToneBrowser {
     const tone=await this.client.tone(id);if(tone.id!==id)throw new Error('The selected tone did not match.');this.tone=tone;this.view='detail';this.modelPage=1;
     $('tone-back').hidden=false;$('tone-more').hidden=true;$('tone-local-search').hidden=true;$('tone-content').replaceChildren(captureCard(tone));
     const description=node('p',tone.description||'','tone-description');const license=node('p',`License: ${tone.license||'See TONE3000'}`,'secondary');
-    const link=node('a','View on TONE3000 ↗','secondary');link.href=toneURL(tone.url);link.target='_blank';link.rel='noopener noreferrer';
+    const link=button('View on TONE3000',()=>this.authorize(tone.id));
     const about=node('details',undefined,'tone-about');about.append(node('summary','About this capture'),description,license,link);$('tone-content').append(about);this.modelList=node('div',undefined,'tone-models');$('tone-content').append(this.modelList);
     if(tone.format!=='nam'){this.say('This plug loads 48 kHz NAM A2 Lite captures. Choose a NAM tone.');return;}
     await this.models(false);
