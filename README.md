@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.9.2) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.10.0) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -10,7 +10,7 @@ A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open
 - Tap a block symbol or its **Enabled / Bypassed** badge to toggle processing. Bypass retains the tile and settings. **Remove** and **Change block** are separate actions; drag or use arrows to reorder.
 - **FX A / FX B** each offer Pitch, Auto Wah, Chorus, Flanger, Phaser, Tremolo and Vibrato. Pitch spans −12 to +12 semitones and is intended for single notes.
 - **High / Low Cut** provides independent adjustable filters, each with Off.
-- **Master volume** controls the plug. On NAMLNK21–28, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
+- **Master volume** controls the plug. On NAMLNK21–29, NAM has input/output gain, bass/middle/treble and mix; **USB recording gain** adjusts the computer recording feed separately.
 - Choose an **8 / 16 / 32-sample** output buffer. NAMLNK18+ saves it globally. This is not a measurement of total guitar latency; time-based effects can add their own delay.
 - Open **Tuner**, pluck one string, and let it ring. The plug measures the input; the page polls over Bluetooth. No microphone or browser audio playback is used.
 
@@ -30,7 +30,15 @@ The integration uses OAuth picker flows and bounded favorites/downloaded/created
 
 On NAMLNK27+, the threshold slider also shows the recent raw guitar input peak. The white marker is the trigger threshold; the bar turns green when the input reaches it and blue below it. The reading updates while the panel is open. Version 0.9.0 keeps background reads visually quiet and waits for an active read before sending a user action. The control-state line shows the physical button mode and, on older firmware, forward/reverse preset order. Firmware 25/26 cannot supply this meter.
 
-## Physical gestures (NAMLNK28)
+## Independent lanes (NAMLNK29 preview)
+
+After recording a base loop, **Start overdub** creates a lane. Use **Record into lane** to add notes to an existing lane. Every pass between Start and Finish belongs to one edit. **Undo edit** restores the sound from before that edit; **Redo edit** restores it again. Starting the next edit replaces the single undo history. Each lane has its own volume, mute, meter and delete control. The base has volume and mute; Delete loop clears everything.
+
+Recording waits while the firmware prepares space, then the lane shows **Recording**. Finish overdub keeps playback running. These controls apply live to RAM; recordings and per-lane mix disappear on power-off. Saving looper settings stores only the global threshold, combined level and 30/60-second mode.
+
+The fixed recording pool holds at most a base plus three overdub lanes. Shorter loops leave space for more lanes and an undo copy. Approximate base-length limits for three lanes **and** editing an existing lane are **6 seconds in 30 s mode**, or **12 seconds in 60 s mode**; block rounding makes the exact limits slightly shorter. A full-length base leaves no space for independent overdubs. The panel reports available capacity and disables edits that do not fit. These are offline-tested preview controls; hardware timing and Bluetooth behavior still need a trial on NAMLNK29. NAMLNK28 and older keep their existing merged-overdub behavior.
+
+## Physical gestures (NAMLNK28–29)
 
 | Action | Gesture |
 | --- | --- |
@@ -52,13 +60,13 @@ sets Looper mode so PRESET can finish the recording.
 
 ## Compatibility and status
 
-Controller **0.9.2** recognizes NAMLNK25–28 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
+Controller **0.10.0** recognizes NAMLNK25–29 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
 ## Looper
 
 On **NAMLNK26–28**, open **Looper** for Arm, Finish/Pause/Play, **Start overdub / Finish overdub**, Stop, **Mute loop**, **Delete loop**, trigger threshold and combined-loop volume. Controller **0.9.1** highlights active overdubbing and shows the confirmed loop cursor moving through the recording. Finish overdub keeps the take and continues playback; ordinary playback does not add guitar. Mute restores the last nonzero volume observed during this connection. It affects the entire loop and does not finish an overdub. Delete loop removes the entire recording after confirmation. **Looper controls / Preset controls** changes the hardware button mode. Selecting another preset leaves the loop/layer running. Opening or closing the panel does not stop playback. NAMLNK25 has basic transport only; settings, layers and button gestures need NAMLNK26.
 
-Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. Overdubs merge into one mono loop without undo. The phone cannot display or independently mute, delete, or meter separate takes because the firmware does not retain them. The moving bar is loop position, not audio volume; the existing input meter is live guitar. Independent layers and exact one-pass overdubbing require firmware support. This controller does not add a timer that could fail while the browser is suspended. Loops are lost on power-off. On NAMLNK28, clear the retained loop and choose **Save looper settings** to retain threshold, level and duration. Live edits alone are not saved. New settings default to −50 dB and 100% level; lower levels are supported. Older firmware settings are volatile. Clear the loop before saving presets to flash.
+Choose **30 s · 24 kHz** (default) or **60 s · 12 kHz** before recording. Long mode reduces loop bandwidth; live guitar remains 48 kHz. On NAMLNK26–28, overdubs merge into one mono loop without undo; separate lanes require NAMLNK29. The moving bar is loop position, not audio volume; the existing input meter is live guitar. Overdubbing continues across as many loop passes as you play until Finish overdub; it does not stop automatically after one revolution. This controller does not add a timer that could fail while the browser is suspended. Loops are lost on power-off. On NAMLNK28, clear the retained loop and choose **Save looper settings** to retain threshold, level and duration. Live edits alone are not saved. New settings default to −50 dB and 100% level; lower levels are supported. Older firmware settings are volatile. Clear the loop before saving presets to flash.
 
 The NAMLNK25 owner confirmed loop recording/playback through preset changes. The owner tested NAMLNK26 phone transport, but reported scratchy 30-second overdubs and missed physical PRESET finishes. NAMLNK27 fixes have offline coverage and need a new hardware/listening check. The latest local builder now offers the NAMLNK28 preview with licensed starters; exact hardware validation remains pending. [Implementation and button guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
 
@@ -70,11 +78,12 @@ The NAMLNK25 owner confirmed loop recording/playback through preset changes. The
 | NAMLNK15+ | Compact automatic tuner |
 | NAMLNK18+ | Global persistent buffer |
 | NAMLNK20+ | Active chain with Add / Remove / Change block |
-| NAMLNK21–28 | NAM tone/mix/gain and independent USB recording gain |
-| NAMLNK24–28 | Retained stock Touch Wah; Daisy-derived Auto Wah in FX A/B |
+| NAMLNK21–29 | NAM tone/mix/gain and independent USB recording gain |
+| NAMLNK24–29 | Retained stock Touch Wah; Daisy-derived Auto Wah in FX A/B |
 | NAMLNK25 | Basic looper transport |
 | NAMLNK26 | Threshold/level, 30/60 s choice, merged overdubs and hardware control mode |
 | NAMLNK27 | Live input meter on the threshold slider; overdub and short physical tap fixes |
+| NAMLNK29 preview | Independent reusable overdub lanes, one-edit undo/redo and seven-slot save refresh fix |
 | NAMLNK28 | Explicit saved looper settings, 100% level default, hold overdub, tap-then-hold clear, single backward preset |
 
 Only explicitly recognized firmware identities are enabled. Automated protocol/browser tests use simulated Bluetooth; they do not establish physical iPhone transfer speed or all effects' real-time headroom. No firmware images are distributed here.
@@ -89,7 +98,7 @@ Original source: **MIT © 2026 santismo**. Mightier Amp notices are retained. NU
 
 ## Firmware compatibility
 
-NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/looper-builder.html). The two wah choices are available in the NAMLNK24–28 test firmware. The latest local builder includes the experimental NAMLNK28 looper.
+NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/looper-builder.html). The two wah choices are available in the NAMLNK24–29 test firmware. The latest local builder includes the experimental NAMLNK28 looper.
 
 The development looper uses single POWER to switch between preset and loop controls, PRESET to arm/finish/pause/resume, and double POWER to stop and exit. See the [button and storage guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
 

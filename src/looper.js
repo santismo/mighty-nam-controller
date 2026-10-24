@@ -1,11 +1,12 @@
 // Explicit, serialized looper commands. No audio streams, mute or flash writes.
 const PREFIX=[240,67,88,112,4,2,78,79,1];
 const same=(a,b)=>a.length===b.length&&a.every((x,i)=>x===b[i]);
-export const hasLooper=identity=>['NAMLNK25','NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(identity);
+export const hasLooper=identity=>['NAMLNK25','NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity);
 export function loopRequest(op,arg,nonce,identity) {
   if(!hasLooper(identity)||!Number.isInteger(nonce)||nonce<1||nonce>16383||!Number.isInteger(arg)||!Number.isInteger(op))throw new Error('Unsupported looper request.');
-  const next=['NAMLNK26','NAMLNK27','NAMLNK28'].includes(identity);
-  if(!(op===0&&arg>=0&&arg<=(['NAMLNK27','NAMLNK28'].includes(identity)?6:next?5:4)||op===1&&arg>=1&&arg<=(next?10:5)||next&&op===2&&arg>=12&&arg<=60||next&&op===3&&arg>=0&&arg<=100||next&&op===4&&[30,60].includes(arg)||identity==='NAMLNK28'&&op===5&&arg===1))throw new Error('Invalid looper control.');
+  const next=['NAMLNK26','NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity);
+  const takes=identity==='NAMLNK29';
+  if(!(op===0&&arg>=0&&arg<=(takes?7:['NAMLNK27','NAMLNK28'].includes(identity)?6:next?5:4)||op===1&&arg>=1&&arg<=(takes?14:next?10:5)||next&&op===2&&arg>=12&&arg<=60||next&&op===3&&arg>=0&&arg<=100||next&&op===4&&[30,60].includes(arg)||['NAMLNK28','NAMLNK29'].includes(identity)&&op===5&&arg===1||takes&&(op>=6&&op<=9&&arg>=0&&arg<=100||op===10&&arg>=0&&arg<=7||(op===11||op===12)&&arg>=1&&arg<=3)))throw new Error('Invalid looper control.');
   return [...PREFIX,op,arg,nonce&127,nonce>>>7,247];
 }
 export function isLoopRequest(message,mutation,current) {
@@ -23,10 +24,10 @@ export function loopReply(message,request) {
 export function decodeLoop(words,identity) {
   let state,length,cursor,pending,sequence,error,settings,faults,flags=0;
   let peak=null;
-  if(['NAMLNK26','NAMLNK27','NAMLNK28'].includes(identity)){
+  if(['NAMLNK26','NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity)){
     if(words.length!==8)throw new Error('Invalid loop status.');
     [state,length,cursor,pending,sequence,error,settings,faults]=words;flags=state>>>8;state&=255;
-    if(['NAMLNK27','NAMLNK28'].includes(identity)){
+    if(['NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity)){
       if(error>>>24)throw new Error('Invalid input meter.');
       peak=(error>>>8)/65535;error&=255;
     }
@@ -34,11 +35,11 @@ export function decodeLoop(words,identity) {
     if(identity!=='NAMLNK25'||words.length!==40||words[0]!==0x4c4f5031||words[1]!==1||words[2]!==2)throw new Error('Invalid loop status.');
     state=words[8];length=words[9];cursor=words[10];pending=words[12];sequence=words[13];error=words[14];faults=words[3];
   }
-  if(identity==='NAMLNK28'&&settings>>>25)throw new Error('Invalid saved loop settings.');
+  if(['NAMLNK28','NAMLNK29'].includes(identity)&&settings>>>25)throw new Error('Invalid saved loop settings.');
   const seconds=settings?(settings>>>16)&255:30,threshold=settings?settings&255:40,volume=settings?(settings>>>8)&255:50;
   if(state>5||length>720000||cursor>length||error>3||flags>15||![30,60].includes(seconds)||threshold<12||threshold>60||volume>100)throw new Error('Invalid loop state.');
   return {state,length,cursor,pending,sequence,error,faults,seconds,threshold,volume,rate:seconds===60?12000:24000,
-    mode:Boolean(flags&1),overdub:Boolean(flags&2),committing:Boolean(flags&4),reverse:Boolean(flags&8),extended:identity!=='NAMLNK25',saveSupported:identity==='NAMLNK28',saved:identity==='NAMLNK28'&&Boolean(settings>>>24&1),peak};
+    mode:Boolean(flags&1),overdub:Boolean(flags&2),committing:Boolean(flags&4),reverse:Boolean(flags&8),extended:identity!=='NAMLNK25',saveSupported:['NAMLNK28','NAMLNK29'].includes(identity),saved:['NAMLNK28','NAMLNK29'].includes(identity)&&Boolean(settings>>>24&1),peak};
 }
 export function thresholdMeter(peak,threshold){
   if(peak===null||peak===undefined)return {available:false,percent:0,above:false,label:'Live level needs NAMLNK27'};
@@ -58,7 +59,11 @@ export class Looper {
   }
   async read(){
     const identity=this.connection.current?.identity;
-    if(['NAMLNK26','NAMLNK27','NAMLNK28'].includes(identity))return decodeLoop(await this.request(0,['NAMLNK27','NAMLNK28'].includes(identity)?6:5),identity);
+    if(['NAMLNK26','NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity)){
+      const state=decodeLoop(await this.request(0,['NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity)?6:5),identity);
+      if(identity==='NAMLNK29')state.takes=decodeTakes(await this.request(0,7));
+      return state;
+    }
     const words=[];for(let i=0;i<5;i++)words.push(...await this.request(0,i));return decodeLoop(words,identity);
   }
   async change(op,arg){
@@ -73,4 +78,12 @@ export class Looper {
     }
     throw new Error('Loop action not confirmed. Refresh before trying again.');
   }
+}
+
+// One page contains all four tracks, avoiding per-track Bluetooth round trips.
+export function decodeTakes(w){
+  if(w.length!==8||w.some(x=>!Number.isInteger(x)||x<0||x>0xffffffff)||w[0]>>>20||w[1]>>>28||w[4]>3||(w[5]&~0x303)||w[7]>720000)throw new Error('Invalid take status.');
+  const tracks=Array.from({length:4},(_,i)=>({index:i,present:Boolean(w[0]&(1<<i)),muted:Boolean(w[0]&(16<<i)),recording:Boolean(w[0]&(256<<i)),undone:Boolean(w[0]&(4096<<i)),level:(w[1]>>>(7*i))&127,peak:((w[2+(i>>1)]>>>(16*(i&1)))&65535)/32768}));
+  if(tracks.some(t=>t.level>100||t.peak>1)||tracks.filter(t=>t.recording).length>1||tracks.filter(t=>t.undone).length>1||(w[5]&3)&&Boolean(w[5]>>>8)||tracks.some(t=>t.recording&&!t.present||t.undone&&t.present))throw new Error('Invalid take status.');
+  return {tracks,available:w[4],undo:Boolean(w[5]&3),redo:Boolean(w[5]>>>8),preparing:(w[0]>>>16)&3,pending:Boolean(w[0]&(1<<18)),canEdit:Boolean(w[0]&(1<<19)),generation:w[6],length:w[7]};
 }

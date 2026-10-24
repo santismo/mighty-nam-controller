@@ -90,3 +90,15 @@ test('loop position and recording status describe confirmed state rather than si
  panel.state.overdub=false;panel.render();assert.match(get('loop-recording-status').textContent,/not being recorded/);assert.match(get('loop-overdub').textContent,/Start overdub/);
  panel.state.extended=false;panel.render();assert.equal(get('loop-overdub').disabled,true);assert.equal(get('loop-mute').disabled,true);
 });
+test('NAMLNK29 take controls use actual capacity and preparation state',t=>{
+ const {panel,state,get}=setup(t);panel.state={...state,state:3,length:24000,overdub:false,takes:{available:1,undo:true,redo:false,canEdit:true,preparing:0,pending:false,tracks:Array.from({length:4},(_,index)=>({index,present:index<3,muted:index===1,recording:false,level:100,peak:.25}))}};
+ panel.render();assert.equal(get('loop-takes').hidden,false);assert.equal(get('take-3').hidden,true);assert.equal(get('take-1-mute').textContent,'Unmute');assert.equal(get('take-2-record').disabled,false);assert.equal(get('take-1-peak').value,.25);assert.equal(get('take-0-status').textContent,'Playing');
+ panel.state.takes.available=0;panel.render();assert.match(get('loop-take-capacity').textContent,/existing lanes can still be edited/);assert.equal(get('take-2-record').disabled,false);
+ panel.state.takes.available=0;panel.state.takes.canEdit=false;panel.render();assert.equal(get('loop-overdub').disabled,true);assert.equal(get('take-2-record').disabled,true);
+ panel.state.takes.preparing=2;panel.state.overdub=true;panel.render();assert.match(get('loop-state').textContent,/Preparing/);assert.match(get('loop-recording-status').textContent,/recording starts when ready/);assert.equal(get('loop-overdub').disabled,false);
+});
+test('NAMLNK29 explicit Start cannot invert a newer physical overdub state',async t=>{
+ const {panel,state}=setup(t),calls=[];panel.state={...state,state:3,length:24000,overdub:false,takes:{available:1,tracks:[]}};
+ panel.loop={read:async()=>panel.state,change:async(...args)=>{calls.push(args);return {...panel.state,overdub:true};}};
+ await panel.overdub();assert.deepEqual(calls,[[1,13]]);
+});

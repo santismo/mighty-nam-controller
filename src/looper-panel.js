@@ -1,4 +1,4 @@
-import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.9.2';
+import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.10.0';
 // A nonmodal panel lets guitar preset selection remain available between polls.
 // Shares the app's busy gate: no poll runs concurrently with a preset/model edit.
 // Avoid rewriting unchanged controls on each meter poll. WebKit visibly
@@ -16,6 +16,21 @@ export class LooperPanel {
     this.get('loop-clear').addEventListener('click',()=>{if(this.state?.length&&!confirm('Delete the entire loop, including every overdub?'))return;this.action(1,5);});
     this.get('loop-overdub').addEventListener('click',()=>this.overdub());
     this.get('loop-mute').addEventListener('click',()=>this.mute());
+    this.get('loop-undo').addEventListener('click',()=>this.action(1,11));
+    this.get('loop-redo').addEventListener('click',()=>this.action(1,12));
+    for(let i=0;i<4;i++){
+      this.get(`take-${i}-mute`).addEventListener('click',()=>{
+        const track=this.state?.takes?.tracks[i];if(track?.present)this.action(10,i*2+Number(!track.muted));
+      });
+      if(i)this.get(`take-${i}-record`).addEventListener('click',()=>this.action(12,i));
+      if(i)this.get(`take-${i}-delete`).addEventListener('click',()=>{
+        if(confirm(`Delete lane ${i}? This cannot be undone.`))this.action(11,i);
+      });
+      const level=this.get(`take-${i}-level`);
+      level.addEventListener('input',()=>put(this.get(`take-${i}-value`),'textContent',`${level.value}%`));
+      level.addEventListener('change',()=>{this.settings.set(6+i,Number(level.value));this.run();});
+      level.addEventListener('blur',()=>this.render());
+    }
     this.get('loop-save').addEventListener('click',()=>{this.settings.set(5,1);this.run();});
     this.get('loop-mode').addEventListener('click',()=>this.action(1,this.state?.mode?10:9));
     for(const [id,op] of [['loop-threshold',2],['loop-volume',3],['loop-duration',4]]){
@@ -48,7 +63,8 @@ export class LooperPanel {
       // button change is reflected before using a stale Finish/Start flag.
       const latest=await this.loop.read();
       if(!latest.extended||latest.state!==3)throw new Error('Play the loop before starting an overdub.');
-      return Boolean(latest.overdub)===desired?latest:this.loop.change(1,6);
+      if(desired&&latest.takes&&!latest.takes.available)throw new Error('No space for another independent take. Delete a take or record a shorter base loop.');
+      return Boolean(latest.overdub)===desired?latest:this.loop.change(1,latest.takes?(desired?13:14):6);
     });
   }
   mute(){
@@ -95,6 +111,29 @@ export class LooperPanel {
     finally{this.busy=false;this.changing=false;this.notifyBusy();this.render();}
     if(good&&this.open&&!this.actionWaiting&&generation===this.generation)this.timer=setTimeout(()=>this.run(),this.settings.size?0:this.state?.peak!==null?125:500);
   }
+  renderTakes(s,disabled){
+    put(this.get('loop-takes'),'hidden',!s?.takes);
+    if(!s?.takes)return;
+    const takes=s.takes;
+    put(this.get('loop-undo'),'disabled',disabled||!takes.undo||takes.pending||Boolean(takes.preparing));
+    put(this.get('loop-redo'),'disabled',disabled||!takes.redo||s.overdub||takes.pending);
+    put(this.get('loop-take-capacity'),'textContent',!s.length?'Up to 3 lanes · shorter loops leave room for undo':takes.available?`${takes.available} more lane${takes.available===1?'':'s'} available${takes.canEdit?' · lane edits supported':''}`:takes.canEdit?'All lanes in use · existing lanes can still be edited':'No space for another edit · delete a lane or use a shorter loop');
+    for(const t of takes.tracks){
+      const i=t.index;put(this.get(`take-${i}`),'hidden',!t.present);
+      put(this.get(`take-${i}-status`),'textContent',i>0&&takes.preparing===i?'Preparing…':t.recording?'Recording':t.muted?'Muted':s.state===3?'Playing':'Stopped');
+      put(this.get(`take-${i}-peak`),'value',s.state===3?t.peak:0);
+      put(this.get(`take-${i}-mute`),'textContent',t.muted?'Unmute':'Mute');
+      put(this.get(`take-${i}-mute`),'disabled',disabled||!t.present);
+      if(i){
+        put(this.get(`take-${i}-delete`),'disabled',disabled||!t.present||takes.pending);
+        put(this.get(`take-${i}-record`),'disabled',disabled||!t.present||s.overdub||takes.pending||!takes.canEdit||s.state!==3);
+      }
+      const field=this.get(`take-${i}-level`);put(field,'disabled',disabled||!t.present);
+      if(document.activeElement!==field&&!this.settings.has(6+i)){
+        put(field,'value',String(t.level));put(this.get(`take-${i}-value`),'textContent',`${t.level}%`);
+      }
+    }
+  }
   labels(){
     put(this.get('loop-threshold-value'),'textContent',`${this.get('loop-threshold').value} dB`);
     put(this.get('loop-volume-value'),'textContent',`${this.get('loop-volume').value}%`);
@@ -107,11 +146,11 @@ export class LooperPanel {
   render(){
     const s=this.state,disabled=this.changing||this.actionWaiting||!s||!this.connection.connected||Boolean(s?.faults);
     const names=['Empty','Armed · waiting for guitar','Recording','Playing','Paused','Stopped'];
-    put(this.get('loop-state'),'textContent',s?.faults?'Memory check failed':s?.overdub?'● Recording overdub':s?names[s.state]:'Reading…');
+    put(this.get('loop-state'),'textContent',s?.faults?'Memory check failed':s?.takes?.preparing?'Preparing lane…':s?.overdub?'● Recording overdub':s?names[s.state]:'Reading…');
     put(this.get('loop-time'),'textContent',s?`${(s.length/s.rate).toFixed(1)} / ${s.seconds} s`:'—');
     this.get('loop-state').classList.toggle('armed',s?.state===1);
     this.get('looper-panel').classList.toggle('overdubbing',Boolean(s?.overdub));
-    put(this.get('loop-recording-status'),'textContent',!s?'Reading recording status…':s.overdub?'Recording new guitar on every pass. Finish overdub keeps the take and continues playback.':s.state===2?'Recording the first loop. Tap Finish loop when ready.':s.state===1?'Armed: your next notes start the first loop.':s.state===3?'Playback only · new guitar is not being recorded.':'Overdub is off. Play the loop, then tap Start overdub to add a take.');
+    put(this.get('loop-recording-status'),'textContent',!s?'Reading recording status…':s.takes?.preparing?'Preparing undo space · recording starts when ready.':s.overdub?'Recording new guitar on every pass. Finish overdub keeps every pass from this edit.':s.state===2?'Recording the first loop. Tap Finish loop when ready.':s.state===1?'Armed: your next notes start the first loop.':s.state===3?'Playback only · new guitar is not being recorded.':'Overdub is off. Play the loop, then tap Start overdub to add a take.');
     const position=s?.length?Math.min(s.cursor||0,s.length):0;
     put(this.get('loop-position'),'max',s?.length||1);put(this.get('loop-position'),'value',position);
     put(this.get('loop-position-label'),'textContent',s?.length?`${(position/s.rate).toFixed(1)} / ${(s.length/s.rate).toFixed(1)} s · loop position`:'No recorded loop');
@@ -125,7 +164,7 @@ export class LooperPanel {
     put(this.get('loop-toggle'),'textContent',s?.state===1?'Cancel arm':s?.state===2?'Finish loop':s?.state===3?'Pause':'Play');
     put(this.get('loop-stop'),'disabled',disabled||s.state===0);
     put(this.get('loop-clear'),'disabled',disabled||s.state===0||!s.extended&&[2,3].includes(s.state));
-    put(this.get('loop-overdub'),'disabled',disabled||!s.extended||s.state!==3);
+    put(this.get('loop-overdub'),'disabled',disabled||!s.extended||s.state!==3||Boolean(s.takes&&!s.overdub&&!s.takes.available));
     put(this.get('loop-overdub'),'textContent',s?.overdub?'■ Finish overdub':'● Start overdub');
     this.get('loop-overdub').setAttribute('aria-pressed',String(Boolean(s?.overdub)));
     put(this.get('loop-mode'),'disabled',disabled||!s.extended);
@@ -139,6 +178,7 @@ export class LooperPanel {
       put(field,'disabled',disabled||!s?.extended||(id==='loop-duration'&&s?.state!==0));
       if(s&&document.activeElement!==field&&!this.settings.has(op))put(field,'value',String(s[key]*(op===2?-1:1)));
     }
+    this.renderTakes(s,disabled);
     this.labels();
     this.get('loop-compatibility').hidden=Boolean(s?.extended);
   }
