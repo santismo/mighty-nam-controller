@@ -1,6 +1,6 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.9.1) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.9.2) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
@@ -20,13 +20,13 @@ Use one controller at a time. Refresh after using the physical PRESET button. Ra
 
 **Powered by [TONE3000](https://www.tone3000.com).**
 
-1. Open **Captures → Browse TONE3000**. Sign in, browse the official catalog, and select a tone.
-2. Choose **Load capture** for a supported **48 kHz A2 Lite** model. A Lite component inside an A2 file is supported; full A2 and other architectures are rejected.
-3. The official picker opens **inside Captures**, keeping the controller page and its Bluetooth connection alive. Sign in inside that panel; an existing TONE3000 login in another Bluefy tab may not carry over. Selecting a tone returns to its model list here; **Load capture** downloads, validates and transfers the A2 Lite model. It becomes active only after checksum/readback confirmation.
-4. **Back to captures** cancels browsing. If the embedded panel stays blank or sign-in restarts, use **Sign-in help → Continue in this tab**. This explicit fallback returns automatically after selection; reconnect Bluetooth before loading. No popup is required. If iOS suspends Bluetooth during embedded browsing, the controller tries to reconnect the previously selected device.
-5. Star captures to keep multiple phone favorites. **Save to plug** separately stores one in a chosen color. Amp-and-cab captures bypass the stock cabinet.
+1. Open **Captures → Browse TONE3000**. Version **0.9.2** checks the controller's authorized account session first. A valid session opens TONE3000 Favorites inside the controller; switch to Downloads, Created, Trending or Latest as needed.
+2. If sign-in is needed, use the same-tab flow that works in Bluefy. After selecting a tone you return automatically. Where `getDevices()` is supported, the controller attempts to restore the previously authorized plug. Otherwise tap Connect once. Navigating away cannot preserve the old page's Bluetooth connection.
+3. Use the in-page collections or phone downloads for subsequent captures: **Load capture** downloads a supported **48 kHz A2 Lite** model, transfers it over the existing Bluetooth connection, and resumes playback after checksum/readback confirmation. It does not save over a preset. A failed prior operation triggers a read-only refresh before a new load when possible.
+4. **Full catalog / search** uses same-tab navigation. **Other browsing option → Try embedded catalog** keeps the page alive, but Bluefy may isolate its sign-in cookies. The controller cannot inspect another website's login cookies.
+5. Star captures for phone favorites. **Save to plug** separately stores one in a chosen color. Amp-and-cab captures bypass the stock cabinet.
 
-The integration uses OAuth picker flows and bounded favorites/downloaded/created/trending/latest feeds. Full search stays on TONE3000. Downloads are user-requested, with creator and license metadata retained. No catalog mirroring, private API key, proxy account or bundled captures. Clearing browser data removes local favorites/downloads, not onboard presets. Up to 64 selected captures are cached locally. Tokens remain in memory; reloading requires signing in through the picker again.
+The integration uses OAuth picker flows and bounded favorites/downloaded/created/trending/latest feeds. Full search stays on TONE3000. Downloads are user-requested, with creator and license metadata retained. No catalog mirroring, private API key, proxy account or bundled captures. Clearing browser data removes local favorites/downloads, not onboard presets. Up to 64 selected captures are cached locally. Tokens stay in this tab’s session storage, survive reloads, and are removed by Sign out. An expired session is refreshed or signed out; it is not inferred from a separate Tone3000 tab.
 
 On NAMLNK27+, the threshold slider also shows the recent raw guitar input peak. The white marker is the trigger threshold; the bar turns green when the input reaches it and blue below it. The reading updates while the panel is open. Version 0.9.0 keeps background reads visually quiet and waits for an active read before sending a user action. The control-state line shows the physical button mode and, on older firmware, forward/reverse preset order. Firmware 25/26 cannot supply this meter.
 
@@ -52,7 +52,7 @@ sets Looper mode so PRESET can finish the recording.
 
 ## Compatibility and status
 
-Controller **0.9.1** recognizes NAMLNK25–28 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
+Controller **0.9.2** recognizes NAMLNK25–28 and retains earlier guitar controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–28; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
 ## Looper
 
@@ -92,3 +92,9 @@ Original source: **MIT © 2026 santismo**. Mightier Amp notices are retained. NU
 NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/looper-builder.html). The two wah choices are available in the NAMLNK24–28 test firmware. The latest local builder includes the experimental NAMLNK28 looper.
 
 The development looper uses single POWER to switch between preset and loop controls, PRESET to arm/finish/pause/resume, and double POWER to stop and exit. See the [button and storage guide](https://github.com/santismo/mighty-nam/tree/main/tools/looper-prototype/layers).
+
+## NAMLNK28 preset-save I/O report
+
+The owner's controller 0.9.1 trace for preset 4 returns preset error **3** (`io_error`), with active slot 2 and occupied mask 7 unchanged. All Bluetooth reply pages arrive. The protocol and firmware support seven colors; this report is not a three-slot limit. The failing storage substep (read, erase, program, or verification) is not included in this protocol reply, so the report alone cannot identify the exact hardware/firmware cause.
+
+Controller 0.9.2 names the flash-storage failure in the UI and diagnostics, keeps the connection, and does not retry the write automatically. Regression tests cover rejection without false success and successful creation of colors 4–7 on a simulated NAMLNK28 device. They do not establish that the owner's physical flash-write failure is fixed. Firmware-level investigation remains necessary; no firmware is installed by this page.

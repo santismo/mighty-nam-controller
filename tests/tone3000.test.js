@@ -6,12 +6,12 @@ const response=(object,status=200)=>new Response(JSON.stringify(object),{status,
 const session={access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer'};
 const redirect='https://santismo.github.io/mighty-nam-controller/';
 async function flow(client){const url=new URL(await client.authorize(redirect));return `${redirect}?state=${url.searchParams.get('state')}&code=test-code&tone_id=123`;}
-test('PKCE authorization, one-use callback and token exchange keep credentials out of persistent storage',async()=>{
+test('PKCE authorization, one-use callback and token exchange retain tokens only in the supplied tab session',async()=>{
   const store=storage(),calls=[],client=new ToneClient({storage:store,fetcher:async(u,o)=>{calls.push([u,o]);return response(session);}});
   const url=new URL(await client.authorize(redirect,{gear:'amp-cab'})),query=url.searchParams,flow=JSON.parse([...store.data.values()][0]);
   assert.equal(query.get('prompt'),'select_tone');assert.equal(query.get('architecture'),'2');assert.equal(query.get('preview'),'false');assert.equal(query.get('gears'),'amp-cab');assert.ok(!query.has('client_secret'));assert.equal(query.get('state'),flow.state);
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(flow.verifier)));assert.equal(query.get('code_challenge'),Buffer.from(digest).toString('base64url'));
-  const callback=`${redirect}?code=test-code&state=${flow.state}&tone_id=123`;assert.equal(await client.complete(callback),123);assert.ok(client.connected);assert.equal(store.data.size,0);assert.equal(calls[0][1].body.get('code_verifier'),flow.verifier);assert.equal(calls[0][1].credentials,'omit');assert.equal(calls[0][1].referrerPolicy,'no-referrer');
+  const callback=`${redirect}?code=test-code&state=${flow.state}&tone_id=123`;assert.equal(await client.complete(callback),123);assert.ok(client.connected);assert.equal(store.data.size,1);assert.equal(store.data.has('namplug.tone.pkce.v1'),false);assert.equal(calls[0][1].body.get('code_verifier'),flow.verifier);assert.equal(calls[0][1].credentials,'omit');assert.equal(calls[0][1].referrerPolicy,'no-referrer');
   await assert.rejects(client.complete(callback));assert.equal(calls.length,1);
 });
 test('state, redirect, expiry, duplicate query, errors and replay cannot exchange a code',async()=>{
@@ -40,4 +40,17 @@ test('oversized responses are refused and non-success download is not treated as
 test('browser fetch default is called without a custom receiver; only model-download routes follow redirects',async()=>{
   const original=globalThis.fetch,calls=[];globalThis.fetch=function(url,options){assert.equal(this,undefined);calls.push([url,options]);return Promise.resolve(response({ok:true}));};
   try{const c=new ToneClient({storage:storage()});await c.response('/api/v1/user');await c.response('/api/v1/models/748130/download/example.nam',{download:true});assert.equal(calls[0][1].redirect,'error');assert.equal(calls[1][1].redirect,'follow');await assert.rejects(c.response('/api/v1/user',{download:true}));assert.equal(calls.length,2);}finally{globalThis.fetch=original;}
+});
+
+test('reload restores the authorized tab session; sign-out removes it',async()=>{
+ const store=storage(),c=new ToneClient({storage:store,fetcher:async()=>response(session)});
+ await c.complete(await flow(c));
+ const restored=new ToneClient({storage:store,fetcher:async()=>response({username:'test'})});
+ assert.equal(restored.connected,true);assert.equal((await restored.checkSession()).username,'test');
+ restored.signOut();assert.equal(new ToneClient({storage:store}).connected,false);assert.equal(store.data.size,0);
+});
+test('invalid saved sessions are ignored and expired authorization is cleared',async()=>{
+ const store=storage();store.setItem('namplug.tone.session.v1','{"access":123}');assert.equal(new ToneClient({storage:store}).connected,false);
+ const c=new ToneClient({storage:store,fetcher:async()=>response({},401)});c.session={access:'fixture',refresh:'fixture',expires:Date.now()+3600000};c.remember();
+ assert.equal(await c.checkSession(),null);assert.equal(c.connected,false);assert.equal(store.data.size,0);
 });

@@ -46,18 +46,41 @@ test('selection returns in-page, downloads a validated A2 Lite capture, and only
  }});
  let browser;
  browser=new ToneBrowser({client,library:new CaptureLibrary(storage()),onSelect:async capture=>{const confirmed=await editor.loadModel(link.current,capture);assert.equal(confirmed.modelCrc,capture.crc);selected.push(capture);browser.showActive(capture);}});
- await browser.authorize();assert.equal(nodes.get('tone-picker').hidden,false);assert.equal(nodes.get('tone-library').hidden,true);
+ await browser.authorize(null,true);assert.equal(nodes.get('tone-picker').hidden,false);assert.equal(nodes.get('tone-library').hidden,true);
  const state=new URL(nodes.get('tone-picker-frame').src).searchParams.get('state');browser.picker.close();
  await browser.callback(`${location.href}?code=fixture-code&state=${state}&tone_id=123`);
  assert.equal(nodes.get('tone-picker').hidden,true);assert.equal(nodes.get('tone-library').hidden,false);assert.equal(selected.length,0);
  const load=nodes.get('tone-content').querySelectorAll('button[data-model-id]')[0];assert.equal(load.textContent,'Load capture');
  await load.onclick();assert.equal(selected.length,1);assert.equal(selected[0].slot.length,8192);assert.equal(load.textContent,'Active on plug');
- assert.equal(fake.saveCount,0);assert.equal(editor.activeCapture.sha,selected[0].sha);
- assert.equal(browser.library.records().length,1);assert.ok(calls.includes('/api/v1/models/456/download/test.nam'));assert.equal(nodes.get('tone-dialog').open,true);
+ const epoch=link.epoch;nam.weights[0]=0.125;await load.onclick();assert.equal(selected.length,2);assert.notEqual(selected[0].crc,selected[1].crc);assert.equal(link.epoch,epoch);assert.equal(link.connected,true);
+ assert.equal(fake.saveCount,0);assert.equal(editor.activeCapture.sha,selected[1].sha);
+ assert.equal(browser.library.records().length,2);assert.ok(calls.includes('/api/v1/models/456/download/test.nam'));assert.equal(nodes.get('tone-dialog').open,true);
 });
 test('failed transfer leaves the downloaded capture available without claiming it is active',async t=>{
  const {nodes}=setup(t);let selected=0;
  const browser=new ToneBrowser({client:{connected:false},library:new CaptureLibrary(storage()),onSelect:async()=>{selected++;throw new Error('Transfer not confirmed');}});
  await browser.job('Loading…',()=>browser.select({sha:'fixture'}));
  assert.equal(selected,1);assert.equal(browser.active,null);assert.equal(nodes.get('tone-message').textContent,'Transfer not confirmed');assert.equal(browser.waiting,false);
+});
+
+test('Browse reuses an authorized session and stays in the controller',async t=>{
+ const {nodes}=setup(t);const calls=[];
+ const browser=new ToneBrowser({client:{connected:true,checkSession:async()=>({username:'test'}),list:async collection=>{calls.push(collection);return {data:[]};}},library:new CaptureLibrary(storage()),onSelect:async()=>{}});
+ browser.authorize=async()=>{throw new Error('Must not navigate an authorized session');};
+ await browser.browse();assert.deepEqual(calls,['favorited']);assert.equal(nodes.get('tone-collection').value,'favorited');assert.equal(browser.picker.active,false);
+});
+test('Browse starts sign-in only when no authorized session is available',async t=>{
+ setup(t);let signs=0;
+ const browser=new ToneBrowser({client:{connected:false,checkSession:async()=>null},library:new CaptureLibrary(storage()),onSelect:async()=>{}});
+ browser.authorize=async()=>signs++;await browser.browse();assert.equal(signs,1);
+});
+
+test('default authorization stays in this tab and records the return connection before navigation',async t=>{
+ const {location}=setup(t),events=[];location.assign=url=>events.push(['navigate',url]);
+ const browser=new ToneBrowser({client:{connected:false,authorize:async redirect=>{assert.equal(redirect,location.href);return 'https://www.tone3000.com/authorize?fixture=true';}},beforeNavigate:()=>events.push(['remember']),library:new CaptureLibrary(storage()),onSelect:async()=>{}});
+ await browser.authorize();assert.deepEqual(events,[['remember'],['navigate','https://www.tone3000.com/authorize?fixture=true']]);assert.equal(browser.picker.active,false);
+});
+test('a session-check network failure does not unexpectedly leave the controller',async t=>{
+ const {nodes}=setup(t);const browser=new ToneBrowser({client:{connected:true,checkSession:async()=>{throw new Error('Network unavailable');}},library:new CaptureLibrary(storage()),onSelect:async()=>{}});
+ browser.authorize=async()=>assert.fail('Must not navigate after a network failure');await browser.browse();assert.equal(nodes.get('tone-message').textContent,'Network unavailable');
 });

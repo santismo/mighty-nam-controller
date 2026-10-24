@@ -1,16 +1,16 @@
-import {LooperPanel} from './looper-panel.js?v=0.9.1';
-import {hasLooper} from './looper.js?v=0.9.1';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.9.1';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.9.1';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.9.1';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.9.1';
-import { PlugConnection } from './device.js?v=0.9.1';
-import { PlugEditor } from './editor.js?v=0.9.1';
-import { LiveEdits } from './live.js?v=0.9.1';
-import { AutoTuner } from './auto-tuner.js?v=0.9.1';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.9.1';
-import { nameBytes } from './commands.js?v=0.9.1';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.9.1';
+import {LooperPanel} from './looper-panel.js?v=0.9.2';
+import {hasLooper} from './looper.js?v=0.9.2';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.9.2';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.9.2';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.9.2';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.9.2';
+import { PlugConnection } from './device.js?v=0.9.2';
+import { PlugEditor } from './editor.js?v=0.9.2';
+import { LiveEdits } from './live.js?v=0.9.2';
+import { AutoTuner } from './auto-tuner.js?v=0.9.2';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.9.2';
+import { nameBytes } from './commands.js?v=0.9.2';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.9.2';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -39,7 +39,7 @@ const autoTuner=new AutoTuner({
   onBusy:value=>{tuning=value;status();if(!value&&!autoTuner.running&&!document.hidden&&$('tuner-dialog').open&&!needsRefresh&&online())queueMicrotask(()=>autoTuner.start());},
   onError:error=>{needsRefresh=true;$('tuner-progress').textContent=error.message;message(error.message,true);status();}
 });
-const tones=new ToneBrowser({onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
+const tones=new ToneBrowser({beforeNavigate:()=>{try{if(connection.connected&&connection.device?.id)sessionStorage.setItem('namplug.tone.device',connection.device.id);else sessionStorage.removeItem('namplug.tone.device');}catch{}},onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
 const live=new LiveEdits(editor,{
   beforeSend:()=>looper.whenIdle(),
   changed:()=>status(),
@@ -91,7 +91,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.9.1 · ${snapshot.identity}`:'0.9.1';
+  $('version').textContent=ready?`0.9.2 · ${snapshot.identity}`:'0.9.2';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -179,7 +179,7 @@ function edit(change,redraw=true){
 function move(id,to){edit(next=>{const order=fullOrder(next,fx),from=order.indexOf(id),dest=order.indexOf(to);order.splice(from,1);order.splice(dest,0,id);const changed=reorder(next,fx,order);next.splice(0,128,...changed.effects);fx=changed.fx;});}
 async function work(label,action){
   if(locked())return;busy=true;const ticket=++operation;message(label);status();
-  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;message(error.message,true);}}
+  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;connection.record(`Operation failed: ${error.message}`);message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();}}
 }
 function clear(){looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}
@@ -292,7 +292,7 @@ async function selectCapture(model){
     await work('Reconnecting to the plug…',async()=>{await connection.reconnect();await editor.readBank();accept(connection.current);pickerDisconnected=false;});
   }
   if(!connection.connected){tones.say('Downloaded. Close Captures and tap Connect to load it onto the plug.');message('Capture ready. Tap Connect to load it onto the plug.');return;}
-  if(needsRefresh)throw new Error('Capture downloaded. Refresh the plug before loading it.');
+  if(needsRefresh){await work('Refreshing the connected plug…',async()=>{accept(await connection.snapshot());await editor.readBank();accept(connection.current);});if(needsRefresh)throw new Error('The connected plug could not be refreshed. Your download is kept.');}
   let loaded=false;
   await work('Loading capture onto plug…',async()=>{await transferCapture(model);loaded=true;});
   if(!loaded)throw new Error('Transfer was not confirmed. Refresh before trying again.');
@@ -307,5 +307,14 @@ $('cancel-capture').addEventListener('click',()=>{loadTicket++;queuedCapture=nul
 window.addEventListener('pagehide',clear);$('browser-help').hidden=Boolean(navigator.bluetooth?.requestDevice);render();
 // Strip single-use authorization codes before any API or image request.
 const callback=new URL(location.href);
-if(['code','state','error','canceled'].some(k=>callback.searchParams.has(k))){history.replaceState(null,'',new URL('./',location.href).href);tones.callback(callback.href);}
+if(['code','state','error','canceled'].some(k=>callback.searchParams.has(k))){history.replaceState(null,'',new URL('./',location.href).href);tones.callback(callback.href).then(restoreToneDevice);}
 else{try{const sha=sessionStorage.getItem('namplug.queued');if(sha)tones.library.get(sha).then(model=>{queuedCapture=model;showQueued();}).catch(()=>sessionStorage.removeItem('namplug.queued'));}catch{}}
+
+async function restoreToneDevice(){
+  let id;try{id=sessionStorage.getItem('namplug.tone.device');sessionStorage.removeItem('namplug.tone.device');}catch{}
+  if(!id||connection.connected)return;
+  if(!navigator.bluetooth?.getDevices){tones.say('Back in the controller. Tap Connect once; then use the in-page collections to try captures without leaving the controller.');return;}
+  try{const devices=await navigator.bluetooth.getDevices(),device=devices.find(d=>d.id===id);if(!device)return;
+    await work('Restoring Bluetooth after TONE3000…',async()=>{accept(await connection.connect(device));await editor.readBank();accept(connection.current);});
+  }catch{tones.say('Tap Connect to restore Bluetooth.');}
+}

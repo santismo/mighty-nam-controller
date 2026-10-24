@@ -1,13 +1,13 @@
-import {Looper,hasLooper} from './looper.js?v=0.9.1';
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.9.1';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.9.1';
-import { fxRequest, fxReply } from './fx.js?v=0.9.1';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.9.1';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.9.1';
-import { detectPitch, pitchReading } from './tuner.js?v=0.9.1';
-import { modelPacket,modelReply } from './model-wire.js?v=0.9.1';
-import { validateModel,includesCab } from './model.js?v=0.9.1';
-import { put,crc32,nameBytes } from './commands.js?v=0.9.1';
+import {Looper,hasLooper} from './looper.js?v=0.9.2';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.9.2';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.9.2';
+import { fxRequest, fxReply } from './fx.js?v=0.9.2';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.9.2';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.9.2';
+import { detectPitch, pitchReading } from './tuner.js?v=0.9.2';
+import { modelPacket,modelReply } from './model-wire.js?v=0.9.2';
+import { validateModel,includesCab } from './model.js?v=0.9.2';
+import { put,crc32,nameBytes } from './commands.js?v=0.9.2';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -45,7 +45,7 @@ export class PlugEditor {
       this.link.record('Incomplete preset reply: 75 of 326 MIDI bytes; large Bluetooth replies unavailable.');
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
     }
-    if(result.error)throw new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}).`);
+    if(result.error){const detail=result.error===3?'The plug reported a flash-storage I/O failure; this is not a preset-count limit. Saving was not confirmed.':result.error===4?'The preset generation counter is exhausted.':'The plug rejected the preset request.';throw Object.assign(new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}). ${detail}`),{code:'preset-error',presetError:result.error,slot});}
     if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;
     this.bank[slot]=result;return result;
   }

@@ -80,7 +80,8 @@ export function editingBluetooth(options={}){
       const q=unpack(m.slice(9,-1)),op=q[5],slot=q[6];let error=0;
       if(op===3){extra.splice(0,32,...bankFx[slot]);effects.splice(0,128,...bank[slot].slice(128));words[5]=get32(bank[slot],16);if(!['NAMLNK18','NAMLNK19', 'NAMLNK20','NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25','NAMLNK26','NAMLNK27','NAMLNK28'].includes(options.identity))words[24]=((words[24]&0xffffff00)|get32(bank[slot],24))>>>0;words[25]=(words[25]&0xffffff00)|slot;}
       if(op===2){
-        if(get32(q,16)!==words[5]||get32(q,20)!==crc(effects))error=2;
+        if(options.saveError)error=options.saveError;
+        else if(get32(q,16)!==words[5]||get32(q,20)!==crc(effects))error=2;
         else{saveCount++;words[25]|=1<<(8+slot);bankFx[slot]=[...extra];const h=header(slot,effects,get32(q,28));set32(h,12,get32(bank[slot],12)+1);set32(h,16,words[5]);set32(h,20,get32(q,24));h.set(q.slice(32,64),32);h.set(q.slice(64,128),64);bank[slot]=h;if(!['NAMLNK18','NAMLNK19', 'NAMLNK20','NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25','NAMLNK26','NAMLNK27','NAMLNK28'].includes(options.identity))words[23]=0;words[25]=(words[25]&0xffffff00)|slot;}
       }
       options.onPreset?.(op,slot,{words,effects,bank});

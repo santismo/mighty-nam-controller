@@ -10,8 +10,8 @@
   <title>mighty-nam</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.png">
-  <link rel="stylesheet" href="./style.css?v=0.9.1">
-  <script type="module" src="./src/entry.js?v=0.9.1"></script>
+  <link rel="stylesheet" href="./style.css?v=0.9.2">
+  <script type="module" src="./src/entry.js?v=0.9.2"></script>
 </head>
 <body>
   <div class="shell">
@@ -66,13 +66,14 @@
           <label class="parameter" for="loop-volume"><span>Combined loop volume <output id="loop-volume-value">50%</output></span><input id="loop-volume" type="range" min="0" max="100" value="50" step="1"></label>
         </div>
         <div class="loop-options"><label>Length <select id="loop-duration"><option value="30">30 s · 24 kHz</option><option value="60">60 s · 12 kHz</option></select></label><button id="loop-mode" class="secondary-button">Looper controls</button><button id="loop-refresh" class="secondary-button">Refresh loop</button></div>
-        <p class="secondary">Finish overdub stops adding guitar; the loop keeps playing. Mute affects the combined loop and does not stop recording. Overdubs merge into one recording: separate take mute, volume, delete and audio meters need new firmware. The moving bar shows loop position; the input meter shows your live guitar.</p>
+        <p class="secondary">Finish overdub stops adding guitar; the loop keeps playing. Mute affects the combined loop and does not stop recording. Overdubs merge into one recording. Undo last overdub, separate take mute, volume, delete and audio meters need new firmware. Delete loop removes everything. The moving bar shows loop position; the input meter shows your live guitar.</p>
         <p class="secondary">Loops stay in memory until deleted or powered off. 60 s has reduced bandwidth.</p>
         <p id="loop-compatibility" class="secondary">Level, threshold and overdub controls need the next looper firmware.</p><p id="loop-control-state" class="secondary"></p>
 <div class="loop-options"><button class="secondary-button" id="loop-save" type="button">Save looper settings</button><span class="secondary" id="loop-save-state"></span></div><details><summary>Plug buttons</summary><p class="secondary" id="loop-gestures"></p></details><p id="loop-error" class="message error" role="alert"></p>
       </section>
       <dialog id="tone-dialog" class="tone-dialog"><div class="dialog-heading"><div><h2>Captures</h2><a class="tone-credit" href="https://www.tone3000.com" target="_blank" rel="noopener noreferrer"><span>Powered by</span> <img src="assets/tone3000.svg" alt="TONE3000" width="100" height="23" style="vertical-align:middle"> ↗</a></div><button id="close-tones" class="secondary-button">Close</button></div>
-        <div id="tone-toolbar" class="tone-toolbar"><button id="tone-catalog" class="primary">Browse TONE3000</button><span id="tone-account"></span><button id="tone-signout" class="secondary-button" hidden>Sign out</button></div>
+        <div id="tone-toolbar" class="tone-toolbar"><button id="tone-catalog" class="primary">Browse TONE3000</button><button id="tone-full-catalog" class="secondary-button">Full catalog / search ↗</button><span id="tone-account"></span><button id="tone-signout" class="secondary-button" hidden>Sign out</button></div>
+        <p class="secondary">Browse checks your TONE3000 connection first and opens your account library here. Full catalog / search uses this tab for Bluefy sign-in and may require Bluetooth reconnection. Once connected, choose captures from the lists below to try them on the plug without leaving this page. Save to plug is separate.</p><details><summary>Other browsing option</summary><button id="tone-embedded" class="secondary-button">Try embedded catalog</button></details>
         <p id="tone-message" class="message" role="status" aria-live="polite"></p>
         <section id="tone-picker" hidden aria-label="TONE3000 browser">
           <div class="tone-picker-controls"><button id="tone-picker-back" class="secondary-button">← Back to captures</button><details><summary>Sign-in help</summary><p>Sign in here to connect TONE3000 to this controller. A login in another Bluefy tab may not carry into this panel.</p><p>If the panel stays blank or sign-in keeps restarting, continue in this tab and return automatically after selecting a tone. Bluetooth will need reconnecting.</p><button id="tone-picker-fallback" class="secondary-button">Continue in this tab</button></details></div>
@@ -89,7 +90,7 @@
       <dialog id="tuner-dialog"><div class="dialog-heading"><h2>Tuner</h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
     </main>
   <footer style="text-align:center;padding:20px;color:#8c929c;font-size:12px"><a href="https://santismo.github.io/mighty-nam/phone.html">Guide</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/LEGAL.md">Legal</a></footer>
-    <footer><span id="version">0.9.1</span><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
+    <footer><span id="version">0.9.2</span><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
     <noscript>Enable JavaScript to connect.</noscript>
   </div>
 </body>
