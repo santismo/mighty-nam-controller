@@ -1,13 +1,13 @@
-import {Looper,hasLooper} from './looper.js?v=0.10.1';
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.10.1';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.10.1';
-import { fxRequest, fxReply } from './fx.js?v=0.10.1';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.10.1';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.10.1';
-import { detectPitch, pitchReading } from './tuner.js?v=0.10.1';
-import { modelPacket,modelReply } from './model-wire.js?v=0.10.1';
-import { validateModel,includesCab } from './model.js?v=0.10.1';
-import { put,crc32,nameBytes } from './commands.js?v=0.10.1';
+import {Looper,hasLooper} from './looper.js?v=0.10.2';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.10.2';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.10.2';
+import { fxRequest, fxReply } from './fx.js?v=0.10.2';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.10.2';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.10.2';
+import { detectPitch, pitchReading } from './tuner.js?v=0.10.2';
+import { modelPacket,modelReply } from './model-wire.js?v=0.10.2';
+import { validateModel,includesCab } from './model.js?v=0.10.2';
+import { put,crc32,nameBytes } from './commands.js?v=0.10.2';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}

@@ -1,6 +1,6 @@
-import {TonePicker} from './tone-picker.js?v=0.10.1';
-import { ToneClient, safeImage } from './tone3000.js?v=0.10.1';
-import { CaptureLibrary, parseModel } from './model.js?v=0.10.1';
+import {TonePicker} from './tone-picker.js?v=0.10.2';
+import { ToneClient, safeImage } from './tone3000.js?v=0.10.2';
+import { CaptureLibrary, parseModel } from './model.js?v=0.10.2';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,fn,cls='secondary-button')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};
@@ -16,8 +16,8 @@ export function captureCard(tone,modelName=null){
   content.append(node('span',facts.filter(Boolean).join(' · '),'secondary'));if(modelName&&modelName!==tone?.title)content.append(node('span',modelName,'secondary'));card.append(content);return card;
 }
 export class ToneBrowser {
-  constructor({onSelect,beforeNavigate=()=>{},onChange=()=>{},isBusy=()=>false,client=new ToneClient(),library=new CaptureLibrary(localStorage)}){
-    Object.assign(this,{onSelect,beforeNavigate,onChange,isBusy,client,library});this.ticket=0;this.waiting=false;this.active=null;this.pending=null;this.view='local';
+  constructor({onSelect,openView=()=>{$('tone-dialog').showModal();},beforeNavigate=()=>{},onChange=()=>{},isBusy=()=>false,client=new ToneClient(),library=new CaptureLibrary(localStorage)}){
+    Object.assign(this,{onSelect,openView,beforeNavigate,onChange,isBusy,client,library});this.ticket=0;this.waiting=false;this.active=null;this.pending=null;this.view='local';
     this.picker=new TonePicker({frame:$('tone-picker-frame'),returned:url=>this.callback(url),failed:error=>this.say(error.message,true),changed:active=>{
       $('tone-picker').hidden=!active;$('tone-library').hidden=active;$('tone-toolbar').hidden=active;$('tone-dialog').classList.toggle('picking',active);
     }});
@@ -32,7 +32,7 @@ export class ToneBrowser {
   say(text,error=false){$('tone-message').textContent=text;$('tone-message').classList.toggle('error',error);}
   controls(){for(const id of ['tone-catalog','tone-full-catalog','tone-embedded','tone-collection','tone-gear','tone-local-search','tone-back','tone-signout','tone-more'])$(id).disabled=this.waiting||this.isBusy();$('tone-signout').hidden=!this.client.connected;for(const b of $('tone-content').querySelectorAll('button'))b.disabled=this.waiting||this.isBusy()||b.dataset.unavailable==='true';}
   async job(label,fn){if(this.waiting||this.isBusy())return;const ticket=++this.ticket;this.waiting=true;this.say(label);this.controls();try{await fn(ticket);}catch(e){if(ticket===this.ticket)this.say(e.message,true);}finally{if(ticket===this.ticket){this.waiting=false;this.controls();}}}
-  open(){if(!$('tone-dialog').open)$('tone-dialog').showModal();if(!this.waiting)this.list();}
+  async open(){if(await this.openView()===false)return;if(!this.waiting)this.list();}
   async browse(){
     let signIn=false;
     await this.job('Checking TONE3000 connection…',async()=>{
@@ -52,7 +52,7 @@ export class ToneBrowser {
   async callback(url){
     // A callback must not disappear if it arrives during a pending plug action.
     if(this.waiting||this.isBusy()){clearTimeout(this.returnTimer);this.returnTimer=setTimeout(()=>this.callback(url),100);return;}
-    if(!$('tone-dialog').open)$('tone-dialog').showModal();
+    if(!$('tone-dialog').open)await this.openView();
     await this.job('Finishing TONE3000 sign-in…',async()=>{
       const id=await this.client.complete(url);
       if(this.client.connected){try{const user=await this.client.profile();$('tone-account').replaceChildren(creator(user));}catch{ $('tone-account').textContent='Signed in'; }}

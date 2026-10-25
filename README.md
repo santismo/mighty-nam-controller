@@ -96,6 +96,12 @@ The canonical page is now **https://santismo.github.io/mighty-nam-controller/**.
 
 Original source: **MIT © 2026 santismo**. Mightier Amp notices are retained. NUX hardware/firmware and creator captures have separate rights. See [legal notes](LEGAL.md) and [privacy](PRIVACY.md). No affiliation or endorsement by NUX, Neural Amp Modeler or TONE3000 is claimed.
 
+## Phone navigation and loop station
+
+Controller **0.10.2** keeps **Signal chain**, **Captures**, **Looper**, and **Tuner** at the top. Signal chain shows presets and effects. Changing pages does not disconnect Bluetooth or stop a loop. Leaving Tuner waits for the current read and restores checked playback output.
+
+The Looper page uses a shared circular position display, large Arm/Finish/Play and Stop controls, and **Add layer / Finish overdub**. NAMLNK29 displays the base and up to three independent layers with audio meters, mute, level, Record and Delete; available layers depend on loop length and memory. Undo/redo are firmware-confirmed. The base is removed with **Clear all loops**, which also clears every layer after confirmation. Recording settings and hardware gestures are collapsed by default. NAMLNK25–28 retain their supported transport/combined-loop controls without showing unsupported independent layers. Opening Looper offline shows the layout with recording controls disabled.
+
 ## Firmware compatibility
 
 NAMLNK23 r2 fixes stereo phone-music playback in firmware. Controller 0.8.3 already supports its unchanged protocol; no page update or preset migration is needed. Get the [local firmware builder and guide](https://santismo.github.io/mighty-nam/looper-builder.html). The two wah choices are available in the NAMLNK24–29 test firmware. The latest local builder lets you select NAMLNK29, NAMLNK28 or NAMLNK23 r2. Choose Firmware at the bottom of the controller to open it; updating is optional and uses the NUX desktop updater, never Bluetooth.

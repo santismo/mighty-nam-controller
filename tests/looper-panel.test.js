@@ -5,7 +5,7 @@ import {LiveEdits} from '../src/live.js';
 const defer=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 function setup(t){
   const old=globalThis.document,nodes=new Map();
-  const get=id=>{if(!nodes.has(id))nodes.set(id,{id,value:'0',disabled:false,hidden:false,textContent:'',addEventListener(){},setAttribute(){},classList:{toggle(){}},style:{setProperty(){}},querySelectorAll(){return [...nodes.values()].filter(n=>n.id!=='close-looper');}});return nodes.get(id);};
+  const get=id=>{if(!nodes.has(id))nodes.set(id,{id,value:'0',disabled:false,hidden:false,textContent:'',addEventListener(){},setAttribute(k,v){this[k]=v;},classList:{toggle(){}},style:{setProperty(){}},querySelectorAll(){return [...nodes.values()].filter(n=>n.id!=='close-looper');}});return nodes.get(id);};
   globalThis.document={hidden:false,activeElement:null,getElementById:get,addEventListener(){}};
   const locks=[],link={current:{identity:'NAMLNK27'},epoch:1,connected:true};let externallyBusy=false;
   const panel=new LooperPanel({connection:link,canRun:()=>!externallyBusy,onBusy:b=>locks.push(b)});
@@ -113,4 +113,14 @@ test('older firmware retains transport without lane controls or incorrect gestur
  assert.equal(get('loop-overdub').disabled,false);assert.equal(get('loop-takes').hidden,true);
  assert.match(get('loop-compatibility').textContent,/Merged overdubs.*NAMLNK29/);
  assert.match(get('loop-gestures').textContent,/hold previous/);
+});
+
+test('circular progress follows confirmed playback, recording capacity, pause and empty state',t=>{
+ const {panel,state,get}=setup(t);
+ panel.state={...state,state:3,length:48000,cursor:12000};panel.render();
+ assert.equal(get('loop-ring')['stroke-dashoffset'],'75');assert.equal(get('loop-clock').textContent,'0.5 s');
+ panel.state.state=4;panel.render();assert.equal(get('loop-ring')['stroke-dashoffset'],'75');
+ panel.state={...state,state:2,length:360000,cursor:360000};panel.render();assert.equal(get('loop-ring')['stroke-dashoffset'],'50');
+ assert.equal(get('loop-arm').hidden,true);assert.equal(get('loop-toggle').hidden,false);
+ panel.state=state;panel.render();assert.equal(get('loop-ring')['stroke-dashoffset'],'100');assert.equal(get('loop-arm').hidden,false);assert.equal(get('loop-toggle').hidden,true);
 });

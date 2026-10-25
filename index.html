@@ -10,8 +10,8 @@
   <title>mighty-nam</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.png">
-  <link rel="stylesheet" href="./style.css?v=0.10.1">
-  <script type="module" src="./src/entry.js?v=0.10.1"></script>
+  <link rel="stylesheet" href="./style.css?v=0.10.2">
+  <script type="module" src="./src/entry.js?v=0.10.2"></script>
 </head>
 <body>
   <div class="shell">
@@ -20,10 +20,17 @@
       <div class="connection"><span id="connection-state" class="status">Offline</span><button id="connect" class="primary">Connect</button></div>
     </header>
     <main>
-      <div class="page-heading"><h1>Signal chain</h1><button id="open-captures" class="secondary-button">Captures</button></div>
+      <h1 class="sr-only">mighty-nam controller</h1>
+      <nav class="page-nav" aria-label="Controller pages">
+        <button id="open-signal" class="secondary-button" aria-pressed="true" aria-controls="signal-page">Signal chain</button>
+        <button id="open-captures" class="secondary-button" aria-pressed="false" aria-controls="tone-dialog">Captures</button>
+        <button id="looper" class="secondary-button" aria-pressed="false" aria-controls="looper-panel" disabled>Looper</button>
+        <button id="tuner" class="secondary-button" aria-pressed="false" aria-controls="tuner-dialog" disabled>Tuner</button>
+      </nav>
       <aside id="browser-help" hidden>On iPhone, open in <a href="https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener noreferrer">Bluefy</a>.</aside>
       <p id="message" class="message" role="status" aria-live="polite"></p>
       <aside id="feature-notice" role="status" hidden></aside>
+      <div id="signal-page" role="region" aria-label="Signal chain and presets">
       <section class="panel" aria-labelledby="preset-heading">
         <div class="section-heading"><h2 id="preset-heading">Presets</h2><span id="active-preset" class="secondary">—</span></div>
         <p id="preset-hint" class="secondary" hidden></p>
@@ -46,8 +53,9 @@
       <section class="device-panel" aria-label="Plug status">
         <dl class="metrics"><div><dt>Buffer</dt><dd><select id="buffer" aria-label="Buffer" disabled><option value="8">8 samples</option><option value="16">16 samples</option><option value="32">32 samples</option></select></dd></div><div><dt>Output</dt><dd id="output">—</dd></div><div><dt>NAM</dt><dd id="model">—</dd></div><div><dt>Device</dt><dd id="health">—</dd></div></dl>
         <p id="buffer-state" class="secondary" role="status">8 samples is the minimum output buffer.</p><p id="latency-note" class="secondary" hidden></p>
-        <div class="device-actions"><button id="looper" class="secondary-button" disabled>Looper</button><button id="tuner" class="secondary-button" disabled>Tuner</button><button id="refresh" class="secondary-button" disabled aria-label="Refresh plug status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.4 7a8 8 0 0 1 13.9 1L20 12M4 12l.7 4A8 8 0 0 0 18.6 17"/></svg><span>Refresh</span></button></div>
+        <div class="device-actions"><button id="refresh" class="secondary-button" disabled aria-label="Refresh plug status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.4 7a8 8 0 0 1 13.9 1L20 12M4 12l.7 4A8 8 0 0 0 18.6 17"/></svg><span>Refresh</span></button></div>
       </section>
+      </div>
       <details id="connection-details" class="connection-details" hidden>
         <summary>Connection details</summary>
         <div class="report-heading"><span>Stays on this device.</span><button id="copy-report" class="secondary-button">Copy report</button></div>
@@ -56,31 +64,63 @@
       </details>
       <section id="queued-capture" class="queued-capture" hidden><div><span class="eyebrow">Ready to load</span><strong id="queued-name"></strong><p class="secondary">Connect the plug to load this capture. Saved presets stay unchanged.</p></div><button id="cancel-capture" class="secondary-button">Cancel</button></section>
       <section id="looper-panel" class="panel looper-panel" hidden aria-label="Looper">
-        <div class="dialog-heading"><h2>Looper</h2><button id="close-looper" class="secondary-button">Close</button></div>
-        <div class="loop-readout"><strong id="loop-state" role="status">Reading…</strong><span id="loop-time">—</span></div>
-        <div class="loop-transport"><button id="loop-arm" class="secondary-button">Arm</button><button id="loop-toggle" class="secondary-button">Play</button><button id="loop-overdub" class="secondary-button" aria-pressed="false">● Start overdub</button><button id="loop-stop" class="secondary-button">Stop</button></div>
-        <p id="loop-recording-status" class="loop-recording-status" role="status">Overdub is off.</p>
-        <div class="loop-mix"><div class="loop-mix-heading"><strong>Combined loop</strong><span id="loop-mix-state">Empty</span></div><progress id="loop-position" max="1" value="0" aria-label="Loop playback position"></progress><small id="loop-position-label">No recorded loop</small><div class="loop-options"><button id="loop-mute" class="secondary-button" aria-pressed="false">Mute loop</button><button id="loop-clear" class="secondary-button">Delete loop</button></div></div>
-        <div class="parameters">
-          <label class="parameter" for="loop-threshold"><span>Trigger threshold <output id="loop-threshold-value">−40 dB</output></span><span id="loop-threshold-meter" class="threshold-meter"><input id="loop-threshold" type="range" min="-60" max="-12" value="-40" step="1" aria-describedby="loop-input-level"></span><small id="loop-input-level">Input —</small></label>
-          <label class="parameter" for="loop-volume"><span>Combined loop volume <output id="loop-volume-value">50%</output></span><input id="loop-volume" type="range" min="0" max="100" value="50" step="1"></label>
+        <div class="dialog-heading"><div><span class="eyebrow">LOOP STATION</span><h2>Looper</h2></div><button id="close-looper" class="secondary-button">Back to chain</button></div>
+        <div class="loop-deck">
+          <div class="loop-dial" id="loop-dial" role="img" aria-label="No recorded loop">
+            <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="dial-track" cx="60" cy="60" r="53"/><circle id="loop-ring" class="dial-fill" cx="60" cy="60" r="53" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>
+            <div class="dial-center"><strong id="loop-clock">0.0 s</strong><span id="loop-mix-state">Empty</span></div>
+          </div>
+          <div class="loop-performance">
+            <strong id="loop-state" role="status">Reading…</strong><span id="loop-time" class="secondary">—</span>
+            <div class="loop-transport"><button id="loop-arm" class="primary">● Arm recording</button><button id="loop-toggle" class="primary" hidden>Play</button><button id="loop-stop" class="secondary-button">■ Stop</button></div>
+            <button id="loop-overdub" class="secondary-button overdub-button" aria-pressed="false">＋ Add layer</button>
+          </div>
         </div>
-        <section id="loop-takes" class="loop-takes" hidden aria-label="Recorded lanes">
-          <div class="dialog-heading"><h3>Lanes</h3><div class="loop-options"><button id="loop-undo" class="secondary-button">Undo edit</button><button id="loop-redo" class="secondary-button">Redo edit</button></div></div>
+        <progress id="loop-position" class="sr-only" max="1" value="0" aria-label="Loop playback position"></progress><small id="loop-position-label">No recorded loop</small>
+        <p id="loop-recording-status" class="loop-recording-status" role="status">Overdub is off.</p>
+        <section id="loop-takes" class="loop-takes" hidden aria-label="Recorded layers">
+          <div class="track-list-heading"><h3>Layers</h3><div class="undo-controls"><button id="loop-undo" class="secondary-button">Undo</button><button id="loop-redo" class="secondary-button">Redo</button></div></div>
+          <div class="track-list"><article id="take-0" class="loop-take" hidden>
+            <div class="track-heading"><strong>Base</strong><span id="take-0-status"></span></div>
+            <meter id="take-0-peak" min="0" max="1" value="0" aria-label="Base audio level"></meter>
+            <label class="parameter track-volume"><span>Level <output id="take-0-value">100%</output></span><input id="take-0-level" type="range" min="0" max="100" value="100" aria-label="Base volume"></label>
+            <div class="track-actions"><button id="take-0-mute" class="secondary-button" aria-label="Mute base" aria-pressed="false">Mute</button></div>
+          </article><article id="take-1" class="loop-take" hidden>
+            <div class="track-heading"><strong>Layer 1</strong><span id="take-1-status"></span></div>
+            <meter id="take-1-peak" min="0" max="1" value="0" aria-label="Layer 1 audio level"></meter>
+            <label class="parameter track-volume"><span>Level <output id="take-1-value">100%</output></span><input id="take-1-level" type="range" min="0" max="100" value="100" aria-label="Layer 1 volume"></label>
+            <div class="track-actions"><button id="take-1-mute" class="secondary-button" aria-label="Mute layer 1" aria-pressed="false">Mute</button><button id="take-1-record" class="secondary-button" aria-label="Record into layer 1">Record</button><button id="take-1-delete" class="secondary-button" aria-label="Delete layer 1">Delete</button></div>
+          </article><article id="take-2" class="loop-take" hidden>
+            <div class="track-heading"><strong>Layer 2</strong><span id="take-2-status"></span></div>
+            <meter id="take-2-peak" min="0" max="1" value="0" aria-label="Layer 2 audio level"></meter>
+            <label class="parameter track-volume"><span>Level <output id="take-2-value">100%</output></span><input id="take-2-level" type="range" min="0" max="100" value="100" aria-label="Layer 2 volume"></label>
+            <div class="track-actions"><button id="take-2-mute" class="secondary-button" aria-label="Mute layer 2" aria-pressed="false">Mute</button><button id="take-2-record" class="secondary-button" aria-label="Record into layer 2">Record</button><button id="take-2-delete" class="secondary-button" aria-label="Delete layer 2">Delete</button></div>
+          </article><article id="take-3" class="loop-take" hidden>
+            <div class="track-heading"><strong>Layer 3</strong><span id="take-3-status"></span></div>
+            <meter id="take-3-peak" min="0" max="1" value="0" aria-label="Layer 3 audio level"></meter>
+            <label class="parameter track-volume"><span>Level <output id="take-3-value">100%</output></span><input id="take-3-level" type="range" min="0" max="100" value="100" aria-label="Layer 3 volume"></label>
+            <div class="track-actions"><button id="take-3-mute" class="secondary-button" aria-label="Mute layer 3" aria-pressed="false">Mute</button><button id="take-3-record" class="secondary-button" aria-label="Record into layer 3">Record</button><button id="take-3-delete" class="secondary-button" aria-label="Delete layer 3">Delete</button></div>
+          </article></div>
           <p id="loop-take-capacity" class="secondary"></p>
-          <article id="take-0" class="loop-take" hidden><div class="loop-mix-heading"><strong>Base loop</strong><span id="take-0-status"></span></div><meter id="take-0-peak" min="0" max="1" value="0" aria-label="Base level"></meter><label class="parameter"><span>Volume <output id="take-0-value">100%</output></span><input id="take-0-level" type="range" min="0" max="100" value="100" aria-label="Base volume"></label><div class="loop-options"><button id="take-0-mute" class="secondary-button">Mute</button></div></article>
-          <article id="take-1" class="loop-take" hidden><div class="loop-mix-heading"><strong>Lane 1</strong><span id="take-1-status"></span></div><meter id="take-1-peak" min="0" max="1" value="0" aria-label="Lane 1 level"></meter><label class="parameter"><span>Volume <output id="take-1-value">100%</output></span><input id="take-1-level" type="range" min="0" max="100" value="100" aria-label="Lane 1 volume"></label><div class="loop-options"><button id="take-1-mute" class="secondary-button">Mute</button><button id="take-1-record" class="secondary-button">Record into lane</button><button id="take-1-delete" class="secondary-button">Delete lane</button></div></article>
-          <article id="take-2" class="loop-take" hidden><div class="loop-mix-heading"><strong>Lane 2</strong><span id="take-2-status"></span></div><meter id="take-2-peak" min="0" max="1" value="0" aria-label="Lane 2 level"></meter><label class="parameter"><span>Volume <output id="take-2-value">100%</output></span><input id="take-2-level" type="range" min="0" max="100" value="100" aria-label="Lane 2 volume"></label><div class="loop-options"><button id="take-2-mute" class="secondary-button">Mute</button><button id="take-2-record" class="secondary-button">Record into lane</button><button id="take-2-delete" class="secondary-button">Delete lane</button></div></article>
-          <article id="take-3" class="loop-take" hidden><div class="loop-mix-heading"><strong>Lane 3</strong><span id="take-3-status"></span></div><meter id="take-3-peak" min="0" max="1" value="0" aria-label="Lane 3 level"></meter><label class="parameter"><span>Volume <output id="take-3-value">100%</output></span><input id="take-3-level" type="range" min="0" max="100" value="100" aria-label="Lane 3 volume"></label><div class="loop-options"><button id="take-3-mute" class="secondary-button">Mute</button><button id="take-3-record" class="secondary-button">Record into lane</button><button id="take-3-delete" class="secondary-button">Delete lane</button></div></article>
-          <small>Record into a lane to add notes. Start → Finish is one edit, including every pass. Undo restores the previous sound. Recordings are kept until cleared or powered off.</small>
         </section>
-        <div class="loop-options"><label>Length <select id="loop-duration"><option value="30">30 s · 24 kHz</option><option value="60">60 s · 12 kHz</option></select></label><button id="loop-mode" class="secondary-button">Looper controls</button><button id="loop-refresh" class="secondary-button">Refresh loop</button></div>
-        <p class="secondary">Finish overdub stops recording and keeps playing. Mute loop affects playback only. Independent lanes and undo require NAMLNK29. Delete loop removes all recordings.</p>
-        <p class="secondary">Loops stay in memory until deleted or powered off. 60 s has reduced bandwidth.</p>
-        <p id="loop-compatibility" class="secondary">Level, threshold and overdub controls need the next looper firmware.</p><p id="loop-control-state" class="secondary"></p>
-<div class="loop-options"><button class="secondary-button" id="loop-save" type="button">Save looper settings</button><span class="secondary" id="loop-save-state"></span></div><details><summary>Plug buttons</summary><p class="secondary" id="loop-gestures"></p></details><p id="loop-error" class="message error" role="alert"></p>
+        <div class="loop-master">
+          <label class="parameter" for="loop-volume"><span>Loop mix <output id="loop-volume-value">100%</output></span><input id="loop-volume" type="range" min="0" max="100" value="100" step="1"></label>
+          <button id="loop-mute" class="secondary-button" aria-pressed="false">Mute loop</button>
+        </div>
+        <p id="loop-compatibility" class="secondary"></p>
+        <p id="loop-error" class="message error" role="alert"></p>
+        <details class="loop-settings"><summary>Recording settings &amp; help</summary>
+          <label class="parameter" for="loop-threshold"><span>Trigger threshold <output id="loop-threshold-value">−40 dB</output></span><span id="loop-threshold-meter" class="threshold-meter"><input id="loop-threshold" type="range" min="-60" max="-12" value="-40" step="1" aria-describedby="loop-input-level"></span><small id="loop-input-level">Input —</small></label>
+          <div class="loop-options"><label>Maximum length <select id="loop-duration"><option value="30">30 s · 24 kHz</option><option value="60">60 s · 12 kHz</option></select></label><button id="loop-refresh" class="secondary-button">Refresh loop</button></div>
+          <div class="loop-options"><button id="loop-mode" class="secondary-button">Looper controls</button><span id="loop-control-state" class="secondary"></span></div>
+          <div class="loop-options"><button class="secondary-button" id="loop-save" type="button">Save looper settings</button><span class="secondary" id="loop-save-state"></span></div>
+          <p class="secondary">Finish overdub keeps the recording and continues playback. Start → Finish is one edit, including every pass. Mute changes playback only; it does not stop recording. The ring shows the shared loop position; layer meters show audio level.</p>
+          <p class="secondary">NAMLNK29 supports a base loop and up to three layers, depending on available memory. Undo restores the last edit; Delete permanently removes a layer. Clearing the base clears all layers. Loops are lost on power-off. 60 s has reduced bandwidth.</p>
+          <details><summary>Plug buttons</summary><p class="secondary" id="loop-gestures"></p></details>
+        </details>
+        <div class="loop-danger"><button id="loop-clear" class="secondary-button">Clear all loops</button></div>
       </section>
-      <dialog id="tone-dialog" class="tone-dialog"><div class="dialog-heading"><div><h2>Captures</h2><a class="tone-credit" href="https://www.tone3000.com" target="_blank" rel="noopener noreferrer"><span>Powered by</span> <img src="assets/tone3000.svg" alt="TONE3000" width="100" height="23" style="vertical-align:middle"> ↗</a></div><button id="close-tones" class="secondary-button">Close</button></div>
+      <dialog id="tone-dialog" class="tone-dialog page-dialog"><div class="dialog-heading"><div><h2>Captures</h2><a class="tone-credit" href="https://www.tone3000.com" target="_blank" rel="noopener noreferrer"><span>Powered by</span> <img src="assets/tone3000.svg" alt="TONE3000" width="100" height="23" style="vertical-align:middle"> ↗</a></div><button id="close-tones" class="secondary-button">Close</button></div>
         <div id="tone-toolbar" class="tone-toolbar"><button id="tone-catalog" class="primary">Browse TONE3000</button><button id="tone-full-catalog" class="secondary-button">Full catalog / search ↗</button><span id="tone-account"></span><button id="tone-signout" class="secondary-button" hidden>Sign out</button></div>
         <p class="secondary">Browse checks your TONE3000 connection first and opens your account library here. Full catalog / search uses this tab for Bluefy sign-in and may require Bluetooth reconnection. Once connected, choose captures from the lists below to try them on the plug without leaving this page. Save to plug is separate.</p><details><summary>Other browsing option</summary><button id="tone-embedded" class="secondary-button">Try embedded catalog</button></details>
         <p id="tone-message" class="message" role="status" aria-live="polite"></p>
@@ -96,10 +136,10 @@
       <dialog id="save-dialog"><div class="dialog-heading"><h2>Save capture to plug</h2><button id="close-save" class="secondary-button">Close</button></div><p class="secondary"></p><label for="save-color" class="eyebrow">Preset color</label><select id="save-color" aria-label="Save to preset color"></select><p id="save-destination" class="secondary"></p><button id="confirm-save" class="primary">Save to this color</button></dialog>
       <dialog id="add-block-dialog"><div class="dialog-heading"><h2 id="add-block-heading">Add block</h2><button id="close-add-block" class="secondary-button">Close</button></div><div id="add-block-list" class="effect-list"></div></dialog>
       <dialog id="effect-dialog"><div class="dialog-heading"><h2 id="effect-heading">Choose effect</h2><button id="close-effects" class="secondary-button">Close</button></div><input id="effect-search" type="search" placeholder="Find an effect" aria-label="Find an effect"><div id="effect-list" class="effect-list"></div></dialog>
-      <dialog id="tuner-dialog"><div class="dialog-heading"><h2>Tuner</h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
+      <dialog id="tuner-dialog" class="page-dialog"><div class="dialog-heading"><h2>Tuner</h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
     </main>
   <footer style="text-align:center;padding:20px;color:#8c929c;font-size:12px"><a href="https://santismo.github.io/mighty-nam/phone.html">Guide</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/LEGAL.md">Legal</a></footer>
-    <footer><span id="version">0.10.1</span><a href="https://santismo.github.io/mighty-nam/builder.html" target="_blank" rel="noopener noreferrer">Firmware</a><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
+    <footer><span id="version">0.10.2</span><a href="https://santismo.github.io/mighty-nam/builder.html" target="_blank" rel="noopener noreferrer">Firmware</a><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
     <noscript>Enable JavaScript to connect.</noscript>
   </div>
 </body>

@@ -1,16 +1,17 @@
-import {LooperPanel} from './looper-panel.js?v=0.10.1';
-import {hasLooper} from './looper.js?v=0.10.1';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.10.1';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.10.1';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.10.1';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.10.1';
-import { PlugConnection } from './device.js?v=0.10.1';
-import { PlugEditor } from './editor.js?v=0.10.1';
-import { LiveEdits } from './live.js?v=0.10.1';
-import { AutoTuner } from './auto-tuner.js?v=0.10.1';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.10.1';
-import { nameBytes } from './commands.js?v=0.10.1';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.10.1';
+import {ControllerPages} from './pages.js?v=0.10.2';
+import {LooperPanel} from './looper-panel.js?v=0.10.2';
+import {hasLooper} from './looper.js?v=0.10.2';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.10.2';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.10.2';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.10.2';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.10.2';
+import { PlugConnection } from './device.js?v=0.10.2';
+import { PlugEditor } from './editor.js?v=0.10.2';
+import { LiveEdits } from './live.js?v=0.10.2';
+import { AutoTuner } from './auto-tuner.js?v=0.10.2';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.10.2';
+import { nameBytes } from './commands.js?v=0.10.2';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.10.2';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -39,14 +40,35 @@ const autoTuner=new AutoTuner({
   onBusy:value=>{tuning=value;status();if(!value&&!autoTuner.running&&!document.hidden&&$('tuner-dialog').open&&!needsRefresh&&online())queueMicrotask(()=>autoTuner.start());},
   onError:error=>{needsRefresh=true;$('tuner-progress').textContent=error.message;message(error.message,true);status();}
 });
-const tones=new ToneBrowser({beforeNavigate:()=>{try{if(connection.connected&&connection.device?.id)sessionStorage.setItem('namplug.tone.device',connection.device.id);else sessionStorage.removeItem('namplug.tone.device');}catch{}},onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
+const tones=new ToneBrowser({openView:()=>pages.show('captures'),beforeNavigate:()=>{try{if(connection.connected&&connection.device?.id)sessionStorage.setItem('namplug.tone.device',connection.device.id);else sessionStorage.removeItem('namplug.tone.device');}catch{}},onSelect:selectCapture,onChange:()=>{detail();status();},isBusy:()=>locked()});
 const live=new LiveEdits(editor,{
   beforeSend:()=>looper.whenIdle(),
   changed:()=>status(),
   accepted:state=>{snapshot=state;message('Applied');status();},
   failed:error=>{needsRefresh=true;message(error.message,true);render();}
 });
-const looper=new LooperPanel({connection,canRun:()=>online()&&!busy&&!tuning&&!live.pending&&!needsRefresh&&!connection.pending&&!$('tuner-dialog').open,onBusy:value=>{loopBusy=value;status();}});
+const looper=new LooperPanel({connection,bindNavigation:false,canRun:()=>online()&&hasLooper(snapshot?.identity)&&!busy&&!tuning&&!live.pending&&!needsRefresh&&!connection.pending&&!$('tuner-dialog').open,onBusy:value=>{loopBusy=value;status();}});
+const pages=new ControllerPages({
+  views:{signal:$('signal-page'),captures:$('tone-dialog'),looper:$('looper-panel'),tuner:$('tuner-dialog')},
+  buttons:{signal:$('open-signal'),captures:$('open-captures'),looper:$('looper'),tuner:$('tuner')},
+  beforeChange:async(from,to)=>{
+    if(busy||live.pending||loopBusy)return false;
+    if(from==='tuner')await finishTuner();
+    if(locked())return false;
+    if(to==='tuner'){
+      let prepared=false;
+      await work('Opening tuner…',async()=>{tunerResume={...snapshot};accept(await editor.listen(false),true);showPitch(null);$('tuner-progress').textContent='Reading guitar…';prepared=true;});
+      if(!prepared)return false;
+    }
+    if(from==='looper'){await looper.whenIdle();looper.close();}
+    return true;
+  },
+  changed:view=>{if(view==='looper')looper.show();if(view==='tuner'){message('Tuner open. Plug muted.');autoTuner.start();}status();}
+});
+$('open-signal').addEventListener('click',()=>pages.show('signal'));
+$('looper').addEventListener('click',()=>pages.show('looper'));
+$('close-looper').addEventListener('click',()=>pages.show('signal'));
+$('tone-dialog').addEventListener('close',()=>{if(pages.current==='captures')pages.show('signal');});
 const chainView=new ChainView(localStorage);let retained=[],viewSlot=null;
 function rememberView(){chainView.write(snapshot?.active,retained);}
 const compact=()=>supportsActiveChain(snapshot?.identity);
@@ -85,16 +107,17 @@ function status(){
   const delayed=fx?[0,16].filter(i=>fx[i+1]&&fx[i+4]>0&&([3,4,7].includes(fx[i])||(fx[i]===1&&fx[i+3]!==12))).map(i=>`${i?'FX B':'FX A'} ${FX_MODES[fx[i]-1]}`):[];
   $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:snapshot?.globalBuffer?'One buffer setting applies to all colors, including after power-off.':'8 samples keeps the minimum output path. Global buffer requires NAMLNK18.';
   $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(snapshot?.identity));
-  $('looper').disabled=!canEdit()||waiting||!hasLooper(snapshot?.identity);
+  $('looper').disabled=busy||live.pending||loopBusy;
+  $('open-signal').disabled=busy||live.pending||loopBusy;
   $('feature-notice').hidden=!ready||!editor.bankWarning;
   $('feature-notice').textContent=editor.bankWarning;
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.10.1 · ${snapshot.identity}`:'0.10.1';
+  $('version').textContent=ready?`0.10.2 · ${snapshot.identity}`:'0.10.2';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
-  $('open-captures').disabled=waiting;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
+  $('open-captures').disabled=busy||live.pending||loopBusy;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
   for(const node of $('chain').querySelectorAll('button'))node.disabled=!canEdit();
   $('add-block').hidden=!online()||!compact();$('add-block').disabled=!canEdit()||!fullOrder(effects??[],fx).some(id=>!shown().includes(id));
   $('move-left').disabled=!canEdit()||(effects&&(!selected||shown()[0]===selected));
@@ -180,9 +203,9 @@ function move(id,to){edit(next=>{const order=fullOrder(next,fx),from=order.index
 async function work(label,action){
   if(locked())return;busy=true;const ticket=++operation;message(label);status();
   try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;connection.record(`Operation failed: ${error.message}`);message(error.message,true);}}
-  finally{if(ticket===operation){busy=false;render();}}
+  finally{if(ticket===operation){busy=false;render();if(looper.open)looper.run();}}
 }
-function clear(){looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}
+function clear(){pages.reset();looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}
 async function recall(slot){
   if(!editor.bank[slot]?.occupied){openSave(slot);return;}
   if(slot===snapshot?.active&&savedMatches())return;
@@ -247,9 +270,7 @@ function choices(){
 }
 $('choose-effect').addEventListener('click',()=>{$('effect-search').value='';$('effect-heading').textContent=blocks[selected][0];choices();$('effect-dialog').showModal();});
 $('effect-search').addEventListener('input',choices);$('close-effects').addEventListener('click',()=>$('effect-dialog').close());
-$('tuner').addEventListener('click',()=>{
-  work('Opening tuner…',async()=>{tunerResume={...snapshot};accept(await editor.listen(false),true);showPitch(null);$('tuner-progress').textContent='Reading guitar…';$('tuner-dialog').showModal();message('Tuner open. Plug muted.');autoTuner.start();});
-});
+$('tuner').addEventListener('click',()=>pages.show('tuner'));
 function showPitch(reading){
     $('tuner-note').textContent=reading?`${reading.note}${reading.octave}`:'—';
     $('tuner-reading').textContent=reading?`${reading.cents>=0?'+':''}${reading.cents.toFixed(1)} cents · ${reading.frequency.toFixed(1)} Hz`:'Pluck one string and let it ring.';
@@ -257,14 +278,15 @@ function showPitch(reading){
     $('tuner-note').classList.toggle('in-tune',Boolean(reading?.inTune));
     $('tuner-progress').textContent='Updates automatically over Bluetooth.';
 }
-$('close-tuner').addEventListener('click',()=>$('tuner-dialog').close());
-$('tuner-dialog').addEventListener('close',async()=>{
-  autoTuner.stop();const expected=tunerResume,epoch=connection.epoch,ticket=operation;tunerResume=null;status();
-  // Let the in-flight capture cancellation finish before sending output state.
+$('close-tuner').addEventListener('click',()=>pages.show('signal'));
+$('tuner-dialog').addEventListener('close',()=>{if(pages.current==='tuner'&&!pages.switching)pages.show('signal');});
+async function finishTuner(){
+  autoTuner.stop();const expected=tunerResume,epoch=connection.epoch,ticket=operation;tunerResume=null;$('tuner-dialog').close();status();
+  // Finish the current read before restoring output or starting a new page's work.
   while(tuning)await new Promise(resolve=>setTimeout(resolve,20));
-  if(!expected||!online()||needsRefresh||connection.epoch!==epoch||operation!==ticket||$('tuner-dialog').open)return;
-  work('Returning to playback…',async()=>{accept(await editor.resume(expected),true);message('Tuner closed. Playback resumed.');});
-});
+  if(!expected||!online()||needsRefresh||connection.epoch!==epoch||operation!==ticket)return;
+  await work('Returning to playback…',async()=>{accept(await editor.resume(expected),true);message('Tuner closed. Playback resumed.');});
+}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){autoTuner.stop();}else if($('tuner-dialog').open&&!needsRefresh&&!tuning&&online())autoTuner.start();});
 connection.addEventListener('diagnostic',diagnostics);
 connection.addEventListener('disconnected',event=>{if(tones.picker.active){pickerDisconnected=true;looper.close();autoTuner.stop();live.reset(null);status();message('Bluetooth paused by the phone. Return here after selecting a capture.');}else{clear();message(`Bluetooth disconnected during: ${event.detail.stage}.`,true);}});
