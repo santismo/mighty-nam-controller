@@ -9,7 +9,7 @@ test('compact pitch is one small frame; nonce/CRC/version gates reject invalid f
  const q=compactTunerRequest(4,124),wire=reply(q);assert.equal(wire.length,42);assert.equal(compactTunerReply(wire,q).frequency,110);
  assert.equal(compactTunerReply(wire,compactTunerRequest(4,125)),null);
  const corrupt=[...wire];corrupt[30]^=1;assert.equal(compactTunerReply(corrupt,q),null);
- for(const id of ['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK30'])assert.equal(allowedCommand(q,true,{identity:id}),false);
+ for(const id of ['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK31'])assert.equal(allowedCommand(q,true,{identity:id}),false);
  assert.equal(allowedCommand(q,true,{identity:'NAMLNK15'}),true);assert.equal(allowedCommand(q,false,{identity:'NAMLNK15'}),false);
  assert.equal(allowedCommand([...q.slice(0,10),1,...q.slice(11)],true,{identity:'NAMLNK15'}),false);
 });

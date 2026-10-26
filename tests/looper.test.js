@@ -27,7 +27,7 @@ test('loop requests are firmware-gated, bounded, and never mute/write flash',()=
     assert.equal(allowedCommand(q,op>0,{identity}),true);
     assert.equal(allowedCommand(q,false,{identity}),op===0);
     assert.equal(allowedCommand(q,true,{identity:'NAMLNK24'}),false);
-    assert.equal(allowedCommand(q,true,{identity:'NAMLNK30'}),false);
+    assert.equal(allowedCommand(q,true,{identity:'NAMLNK31'}),false);
     assert.equal(q[7],79);
   }
   for(const [op,arg] of [[0,5],[1,6],[1,10],[2,12],[2,60],[3,0],[3,100],[4,30],[4,60]]){

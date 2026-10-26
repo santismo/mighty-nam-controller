@@ -1,17 +1,18 @@
-import {ControllerPages} from './pages.js?v=0.10.2';
-import {LooperPanel} from './looper-panel.js?v=0.10.2';
-import {hasLooper} from './looper.js?v=0.10.2';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.10.2';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.10.2';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.10.2';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.10.2';
-import { PlugConnection } from './device.js?v=0.10.2';
-import { PlugEditor } from './editor.js?v=0.10.2';
-import { LiveEdits } from './live.js?v=0.10.2';
-import { AutoTuner } from './auto-tuner.js?v=0.10.2';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.10.2';
-import { nameBytes } from './commands.js?v=0.10.2';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.10.2';
+import {isAmp,ampModel,ampSlot,configureAmp} from './amp-ui.js?v=0.11.0';
+import {ControllerPages} from './pages.js?v=0.11.0';
+import {LooperPanel} from './looper-panel.js?v=0.11.0';
+import {hasLooper} from './looper.js?v=0.11.0';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.0';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.0';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.0';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.0';
+import { PlugConnection } from './device.js?v=0.11.0';
+import { PlugEditor } from './editor.js?v=0.11.0';
+import { LiveEdits } from './live.js?v=0.11.0';
+import { AutoTuner } from './auto-tuner.js?v=0.11.0';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.0';
+import { nameBytes } from './commands.js?v=0.11.0';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.0';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -28,6 +29,7 @@ const blocks={
   8:['Reverb','Reverb','M3 9l3 6 3-6 3 6 3-6 3 6 3-6M3 4h18M3 20h18'],
   9:['Cabinet','Cab','M5 3h14v18H5zM15 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0M15 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0']
 };
+function blockLabel(id){return isAmp(id,fx)?['Amp','Amp','M3 5h18v14H3zM6 8h1m3 0h1m3 0h1m3 0h1M6 12h12M6 15h12']:blocks[id];}
 let snapshot=null,effects=null,fx=null,buffer=8,selected=3,busy=false,needsRefresh=false,operation=0,dragged=null;
 let queuedCapture=null,activeCapture=null,loadTicket=0,activeTicket=0,tuning=false,tunerResume=null;
 let loopBusy=false,pickerDisconnected=false;
@@ -99,14 +101,14 @@ function status(){
   $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
   $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
-  $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
+  $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
   $('master-volume').disabled=!canEdit();$('master-volume').value=effects?.[84]??0;$('master-value').textContent=effects?`${effects[84]} %`:'—';
   $('buffer').disabled=!canEdit();$('buffer').value=String(buffer);
   const saved=editor.bank[snapshot?.active];
   $('buffer-state').textContent=!ready?'8 samples is the minimum output buffer.':live.pending?`Applying · last confirmed ${snapshot.buffer} samples`:snapshot.bufferStorageError?'Global buffer storage needs attention. Refresh the plug.':snapshot.globalBuffer?`Global · ${snapshot.buffer} samples · saved for every color`:`${snapshot.buffer} samples · this preset (global control needs NAMLNK18)`;
   const delayed=fx?[0,16].filter(i=>fx[i+1]&&fx[i+4]>0&&([3,4,7].includes(fx[i])||(fx[i]===1&&fx[i+3]!==12))).map(i=>`${i?'FX B':'FX A'} ${FX_MODES[fx[i]-1]}`):[];
   $('latency-note').hidden=!ready;$('latency-note').textContent=delayed.length?`${delayed.join(' and ')} adds effect delay even at 8 samples.`:snapshot?.globalBuffer?'One buffer setting applies to all colors, including after power-off.':'8 samples keeps the minimum output path. Global buffer requires NAMLNK18.';
-  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(snapshot?.identity));
+  $('tuner').disabled=!canEdit()||waiting||(editor.largeReplies!==true&&!['NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(snapshot?.identity));
   $('looper').disabled=busy||live.pending||loopBusy;
   $('open-signal').disabled=busy||live.pending||loopBusy;
   $('feature-notice').hidden=!ready||!editor.bankWarning;
@@ -114,7 +116,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.10.2 · ${snapshot.identity}`:'0.10.2';
+  $('version').textContent=ready?`0.11.0 · ${snapshot.identity}`:'0.11.0';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=busy||live.pending||loopBusy;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -143,11 +145,11 @@ function renderChain(){
   if(compact())$('chain-hint').textContent=`${shown().length} ${shown().length===1?'block':'blocks'}`;
   if(compact()&&!shown().length)$('chain').append(el('p','Direct signal · add a block to begin.','secondary'));
   for(const id of shown()){
-    const [name,short,path]=blocks[id],bypassed=id>9?!fx[(id-11)*16+1]:Boolean(effects[id]&64);
-    const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.dataset.effect=effectColors[id];block.draggable=true;
+    const [name,short,path]=blockLabel(id),bypassed=id>9?!fx[(id-11)*16+1]:Boolean(effects[id]&64);
+    const block=el('div',undefined,`block${bypassed?' bypassed':''}${selected===id?' selected':''}`);block.dataset.id=id;block.dataset.effect=isAmp(id,fx)?'drive':effectColors[id];block.draggable=true;
     const power=button('',()=>toggleBlock(id),`${bypassed?'Enable':'Bypass'} ${name}`);power.className='block-power';power.setAttribute('aria-pressed',String(!bypassed));
     const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');const line=document.createElementNS(icon.namespaceURI,'path');line.setAttribute('d',path);icon.append(line);power.append(icon);
-    const select=button('',()=>{selected=id;renderChain();detail();status();},`Edit ${name}`);select.className='block-select';select.setAttribute('aria-pressed',String(selected===id));select.append(el('span',short),el('small',bypassed?'Bypassed':'On'));
+    const select=button('',()=>{selected=id;renderChain();detail();status();},`Edit ${name}`);select.className='block-select';select.setAttribute('aria-pressed',String(selected===id));select.append(el('span',short),el('small',bypassed?'Bypassed':ampModel(id,fx)??'On'));
     block.addEventListener('dragstart',event=>{if(!canEdit()){event.preventDefault();return;}dragged=id;event.dataTransfer.setData('text/plain',String(id));});
     block.addEventListener('dragover',event=>event.preventDefault());
     block.addEventListener('drop',event=>{event.preventDefault();if(dragged&&canEdit())move(dragged,id);dragged=null;});
@@ -156,26 +158,27 @@ function renderChain(){
   $('chain').scrollLeft=scroll;
 }
 function detail(){
-  $('block-detail').dataset.effect=effectColors[selected]??'nam';
+  $('block-detail').dataset.effect=isAmp(selected,fx)?'drive':effectColors[selected]??'nam';
   const ready=online()&&Boolean(selected),choice=ready&&selected<10?chosenEffect(effects,selected,snapshot?.identity):null;
   $('block-detail').hidden=online()&&compact()&&!selected;
-  $('block-name').textContent=ready?blocks[selected][0]:'No block selected';
+  $('block-name').textContent=ready?blockLabel(selected)[0]:'No block selected';
   const enabled=ready&&(selected>9?Boolean(fx[(selected-11)*16+1]):!(effects[selected]&64));
   $('block-state').textContent=ready?(enabled?'Enabled':'Bypassed'):'—';
   $('block-state').setAttribute('aria-pressed',String(enabled));
-  $('block-state').setAttribute('aria-label',ready?`${blocks[selected][0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
-  $('block-state').title=ready?`Tap to ${enabled?'bypass':'enable'} ${blocks[selected][0]}`:'';
+  $('block-state').setAttribute('aria-label',ready?`${blockLabel(selected)[0]}: ${enabled?'Enabled':'Bypassed'}`:'Selected block enabled');
+  $('block-state').title=ready?`Tap to ${enabled?'bypass':'enable'} ${blockLabel(selected)[0]}`:'';
   $('block-info').textContent=!ready?'':selected===3?(activeCapture?'A2 Lite':snapshot.loaded?'Onboard capture':''):selected===4&&choice?.id===4?'12 dB/oct':'';
   $('remove-block').hidden=!ready||!compact();$('change-block').hidden=!ready||!compact();
   $('nam-controls').hidden=!ready||selected!==3;tones.showActive(activeCapture);
   $('choose-effect').hidden=!ready||selected===3;$('choose-effect').textContent=selected>9&&fx?`${FX_MODES[fx[(selected-11)*16]-1]}  ›`:choice?`${choice.name}  ›`:'Choose effect';
   $('parameters').replaceChildren();
-  if(ready&&selected===3&&['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(snapshot.identity))for(const p of namParameters){
+  if(ready&&selected===3&&['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(snapshot.identity))for(const p of namParameters){
     const config=readNam(effects),label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output',p.label(config[p.index])),control=el('input');
     heading.append(value);control.type='range';control.min=0;control.max=p.max;control.step=1;control.value=config[p.index];control.setAttribute('aria-label',p.name);
     control.addEventListener('input',()=>{value.textContent=p.label(Number(control.value));edit(next=>{const c=readNam(next);c[p.index]=Number(control.value);putNam(next,c);},false);});label.append(heading,control);$('parameters').append(label);
   }
-  if(ready&&selected>9)for(const p of fxControls(fx,selected-11)){
+  if(ready&&selected>9)for(const p of fxControls(fx,selected-11,snapshot)){
+    if(p.options){const label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),control=el('select');for(const o of p.options){const option=el('option',o.label);option.value=o.value;control.append(option);}control.value=fx[p.index];control.setAttribute('aria-label',p.name);control.addEventListener('change',()=>{fx[p.index]=Number(control.value);edit(()=>{});});label.append(heading,control);$('parameters').append(label);continue;}
     const label=el('label',undefined,'parameter'),heading=el('span',p.name,'parameter-heading'),value=el('output'),control=el('input');
     const format=p.label??(v=>`${v} %`);value.textContent=format(fx[p.index]);heading.append(value);
     control.type='range';control.min=p.min??0;control.max=p.max??100;control.step=1;control.value=fx[p.index];control.setAttribute('aria-label',p.name);control.dataset.fx=p.index;
@@ -236,13 +239,21 @@ function chooseBlock(replacing=false){
   if(!canEdit()||!compact())return;
   const previous=selected;
   $('add-block-heading').textContent=replacing?'Change block':'Add block';
-  $('add-block-list').replaceChildren(...fullOrder(effects,fx).filter(id=>!shown().includes(id)).map(id=>button(blocks[id][0],()=>{
+  $('add-block-list').replaceChildren(...fullOrder(effects,fx).filter(id=>!shown().includes(id)&&!(!replacing&&isAmp(id,fx)&&snapshot?.stockAmp)).map(id=>button(blocks[id][0],()=>{
     if(!canEdit())return;
     const changed=replacing?replaceBlock(effects,fx,previous,id,snapshot.identity):membership(effects,fx,id,true,snapshot.identity);
     if(replacing)retained=retained.filter(x=>x!==previous);
     if(!retained.includes(id))retained.push(id);rememberView();fx=changed.fx;selected=id;
     $('add-block-dialog').close();edit(next=>next.splice(0,128,...changed.effects));
   })));
+  const amp=ampSlot(fx,shown(),snapshot);
+  if(!replacing&&amp!==null)$('add-block-list').prepend(button('Amp',()=>{
+    if(!canEdit())return;
+    fx=configureAmp(fx,amp,snapshot);
+    const changed=membership(effects,fx,amp,true,snapshot.identity);
+    if(!retained.includes(amp))retained.push(amp);rememberView();fx=changed.fx;selected=amp;
+    $('add-block-dialog').close();edit(next=>next.splice(0,128,...changed.effects));
+  }));
   if(!$('add-block-list').children.length)$('add-block-list').append(el('p','All available block types are already in this chain.','secondary'));
   $('add-block-dialog').showModal();
 }
@@ -262,13 +273,13 @@ $('move-left').addEventListener('click',()=>{const order=shown();move(selected,o
 $('move-right').addEventListener('click',()=>{const order=shown();move(selected,order[order.indexOf(selected)+1]);});
 function choices(){
   const query=$('effect-search').value.trim().toLowerCase();
-  const choices=(selected>9?FX_MODES.map((name,i)=>({name,id:i+1})):effectChoices(selected,snapshot?.identity)).filter(choice=>choice.name.toLowerCase().includes(query));
+  const choices=(selected>9?FX_MODES.map((name,i)=>({name,id:i+1})).filter(c=>c.id<8||snapshot?.stockAmp):effectChoices(selected,snapshot?.identity)).filter(choice=>choice.name.toLowerCase().includes(query));
   $('effect-list').replaceChildren(...choices.map(choice=>{
-    const b=button(choice.name,()=>{if(selected>9){const i=(selected-11)*16;fx[i]=choice.id;fx[i+3]=12;fx[i+4]=[3,4,5].includes(choice.id)?50:100;}else effects=changeType(effects,selected,choice.id,snapshot?.identity);$('effect-dialog').close();edit(()=>{});});
+    const b=button(choice.name,()=>{if(selected>9){const i=(selected-11)*16;if(choice.id===8&&fx[i===0?16:0]===8){message('Only one stock amp block is available.',true);return;}fx[i]=choice.id;if(choice.id===8)for(let n=5;n<=9;n++)fx[i+n]=50;fx[i+3]=choice.id===8?1:12;fx[i+4]=[3,4,5].includes(choice.id)?50:100;fx[i+10]=0;}else effects=changeType(effects,selected,choice.id,snapshot?.identity);$('effect-dialog').close();edit(()=>{});});
     b.className='effect-choice';b.setAttribute('aria-pressed',String((selected>9?fx[(selected-11)*16]:effects[selected]&63)===choice.id));return b;
   }));if(!choices.length)$('effect-list').append(el('p','No matching effects.','secondary'));
 }
-$('choose-effect').addEventListener('click',()=>{$('effect-search').value='';$('effect-heading').textContent=blocks[selected][0];choices();$('effect-dialog').showModal();});
+$('choose-effect').addEventListener('click',()=>{$('effect-search').value='';$('effect-heading').textContent=blockLabel(selected)[0];choices();$('effect-dialog').showModal();});
 $('effect-search').addEventListener('input',choices);$('close-effects').addEventListener('click',()=>$('effect-dialog').close());
 $('tuner').addEventListener('click',()=>pages.show('tuner'));
 function showPitch(reading){
@@ -321,7 +332,7 @@ async function selectCapture(model){
 }
 async function transferCapture(model){
   const ticket=++loadTicket;
-  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
+  if(!['NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(snapshot.identity))throw new Error('Capture transfer requires NAMLNK14. Your download is kept on this phone.');
   const state=await editor.loadModel(snapshot,model,{canceled:()=>ticket!==loadTicket,progress:(n,total)=>{const text=`Loading ${captureName(model)} · ${Math.round(n/total*100)}%`;message(text);tones.say(text);}});
   activeCapture=model;accept(state);$('preset-name').value=shortPresetName(model);selected=3;queuedCapture=null;showQueued();render();tones.say(`${captureName(model)} is active. Keep browsing to try another capture.`);message(`${captureName(model)} loaded`);
 }
