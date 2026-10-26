@@ -1,18 +1,18 @@
-import {isAmp,ampModel,ampSlot,configureAmp} from './amp-ui.js?v=0.11.0';
-import {ControllerPages} from './pages.js?v=0.11.0';
-import {LooperPanel} from './looper-panel.js?v=0.11.0';
-import {hasLooper} from './looper.js?v=0.11.0';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.0';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.0';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.0';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.0';
-import { PlugConnection } from './device.js?v=0.11.0';
-import { PlugEditor } from './editor.js?v=0.11.0';
-import { LiveEdits } from './live.js?v=0.11.0';
-import { AutoTuner } from './auto-tuner.js?v=0.11.0';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.0';
-import { nameBytes } from './commands.js?v=0.11.0';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.0';
+import {isAmp,ampModel,ampSlot,configureAmp,ampUnavailable} from './amp-ui.js?v=0.11.1';
+import {ControllerPages} from './pages.js?v=0.11.1';
+import {LooperPanel} from './looper-panel.js?v=0.11.1';
+import {hasLooper} from './looper.js?v=0.11.1';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.1';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.1';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.1';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.1';
+import { PlugConnection } from './device.js?v=0.11.1';
+import { PlugEditor } from './editor.js?v=0.11.1';
+import { LiveEdits } from './live.js?v=0.11.1';
+import { AutoTuner } from './auto-tuner.js?v=0.11.1';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.1';
+import { nameBytes } from './commands.js?v=0.11.1';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.1';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -116,7 +116,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.11.0 · ${snapshot.identity}`:'0.11.0';
+  $('version').textContent=ready?`0.11.1 · ${snapshot.identity}`:'0.11.1';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=busy||live.pending||loopBusy;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -254,6 +254,8 @@ function chooseBlock(replacing=false){
     if(!retained.includes(amp))retained.push(amp);rememberView();fx=changed.fx;selected=amp;
     $('add-block-dialog').close();edit(next=>next.splice(0,128,...changed.effects));
   }));
+  const unavailable=ampUnavailable(snapshot);
+  if(!replacing&&unavailable){const option=button('Amp · firmware update needed',()=>{});option.disabled=true;$('add-block-list').prepend(option);$('add-block-list').append(el('p',unavailable,'secondary'));}
   if(!$('add-block-list').children.length)$('add-block-list').append(el('p','All available block types are already in this chain.','secondary'));
   $('add-block-dialog').showModal();
 }

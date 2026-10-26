@@ -1,13 +1,13 @@
-import {Looper,hasLooper} from './looper.js?v=0.11.0';
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.11.0';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.11.0';
-import { fxRequest, fxReply } from './fx.js?v=0.11.0';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.11.0';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.11.0';
-import { detectPitch, pitchReading } from './tuner.js?v=0.11.0';
-import { modelPacket,modelReply } from './model-wire.js?v=0.11.0';
-import { validateModel,includesCab } from './model.js?v=0.11.0';
-import { put,crc32,nameBytes } from './commands.js?v=0.11.0';
+import {Looper,hasLooper} from './looper.js?v=0.11.1';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.11.1';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.11.1';
+import { fxRequest, fxReply } from './fx.js?v=0.11.1';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.11.1';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.11.1';
+import { detectPitch, pitchReading } from './tuner.js?v=0.11.1';
+import { modelPacket,modelReply } from './model-wire.js?v=0.11.1';
+import { validateModel,includesCab } from './model.js?v=0.11.1';
+import { put,crc32,nameBytes } from './commands.js?v=0.11.1';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -44,6 +44,10 @@ export class PlugEditor {
     if(result.truncated){
       this.link.record('Incomplete preset reply: 75 of 326 MIDI bytes; large Bluetooth replies unavailable.');
       throw Object.assign(new Error('The plug returned an incomplete preset reply over Bluetooth.'),{code:'large-reply-truncated'});
+    }
+    if(result.error===3&&this.link.current?.firmwareRevision===0x4e300002){
+      try{const status=await this.link.readPage(124),address=await this.link.readPage(125);this.link.record(`Storage diagnostics: status ${status.toString(16)}; address ${address.toString(16)}; no retry sent`);}
+      catch(error){this.link.record(`Storage diagnostics unavailable: ${error.message}`);}
     }
     if(result.error){const detail=result.error===3?'The plug reported a flash-storage I/O failure; this is not a preset-count limit. Saving was not confirmed.':result.error===4?'The preset generation counter is exhausted.':'The plug rejected the preset request.';throw Object.assign(new Error(`Preset ${slot+1} ${op===2?'save':'request'} failed (code ${result.error}). ${detail}`),{code:'preset-error',presetError:result.error,slot});}
     if(['NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(this.link.current?.identity))result.fx=(await this.fx(2,slot)).config;

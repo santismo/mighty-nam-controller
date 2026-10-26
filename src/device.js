@@ -1,10 +1,10 @@
-import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.11.0';
-import { fxRequest, fxReply } from './fx.js?v=0.11.0';
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.11.0';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.11.1';
+import { fxRequest, fxReply } from './fx.js?v=0.11.1';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.11.1';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.11.0';
-import { allowedCommand } from './commands.js?v=0.11.0';
-import { validateEffects } from './controls.js?v=0.11.0';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.11.1';
+import { allowedCommand } from './commands.js?v=0.11.1';
+import { validateEffects } from './controls.js?v=0.11.1';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -39,7 +39,7 @@ export class PlugConnection extends EventTarget {
     const s=this.current;
     const summary=s?`Firmware: ${s.identity}\nConfirmed buffer: ${s.buffer} samples at ${s.sampleRate} Hz\nBuffer scope: ${s.globalBuffer?'Global · saved on plug':'Per preset'}${s.bufferStorageError?' · storage error':''}\nActive color index: ${s.active}; capture CRC: ${s.modelCrc}; faults: ${s.faults}\nOutput: ${s.listening?'on':'muted'}; settling: ${s.settling}\nLive stock effects: ${s.effects.join(',')}\nLive FX A/B: ${s.fx?.join(',')??'unavailable'}\n`:'';
     const codec=s?.codec?`Converter startup: ${s.codec.verified?'short-delay setting verified':'setting unverified'}; ${s.codec.raw.toString(16)}\n`:'';
-    return `mighty-nam controller 0.11.0\n${summary}${codec}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `mighty-nam controller 0.11.1\n${summary}${codec}${s?`Stock amp capability: ${s.stockAmp?'available':'unavailable'}; response ${s.stockAmpCapability?.error??'unknown'} / ${(s.stockAmpCapability?.value??0).toString(16)}; revision ${(s.firmwareRevision??0).toString(16)}\n`:''}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async reconnect(){
@@ -211,7 +211,8 @@ export class PlugConnection extends EventTarget {
       state.codec=decodeCodecStatus(await this.readPage(117));
       this.record(`Converter startup: ${state.codec.verified?'short-delay setting verified':'setting unverified'}; ${state.codec.raw.toString(16)}`);
     }
-    state.stockAmp=false;state.stockAmpModels=[];if(['NAMLNK29','NAMLNK30'].includes(identity)){const cap=await this.request(pageRequest(126),m=>parsePage(m,126),'Reading stock amp capability');state.stockAmp=cap.error===0&&[0x53540105,0x5354011d].includes(cap.value);state.stockAmpModels=!state.stockAmp?[]:cap.value===0x53540105?[1,26,27,28,29]:Array.from({length:29},(_,i)=>i+1);}
+    state.stockAmp=false;state.stockAmpModels=[];if(['NAMLNK29','NAMLNK30'].includes(identity)){const cap=await this.request(pageRequest(126),m=>parsePage(m,126),'Reading stock amp capability');state.stockAmpCapability=cap;state.stockAmp=cap.error===0&&[0x53540105,0x5354011d].includes(cap.value);state.stockAmpModels=!state.stockAmp?[]:cap.value===0x53540105?[1,26,27,28,29]:Array.from({length:29},(_,i)=>i+1);}
+    if(identity==='NAMLNK30'&&state.stockAmp){const revision=await this.request(pageRequest(127),m=>parsePage(m,127),'Reading firmware revision');state.firmwareRevision=revision.error?null:revision.value;}
     this.current = state; this.progress('Ready'); return state;
   }
   async refresh() {

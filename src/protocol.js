@@ -6,14 +6,14 @@ const prefix = [240, 67, 88, 112, 4, 2];
 const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 const starts = (a, b) => b.every((x, i) => x === a[i]);
 export const pageRequest = page => {
-  if (!Number.isInteger(page) || page < 0 || (page > 25 && page !== 117 && page !== 126)) throw new Error('Invalid status page');
+  if (!Number.isInteger(page) || page < 0 || (page > 25 && page !== 117 && (page < 124 || page > 127))) throw new Error('Invalid status page');
   return [...prefix, 78, 80, page, 247];
 };
 // Status-only allowlist. Typed editor commands are separately bounded in commands.js.
 export function isReadOnlyRequest(message) {
   return same(message, IDENTITY_REQUEST) || same(message, CHAIN_REQUEST) ||
     (message.length === 10 && starts(message, [...prefix, 78, 80]) &&
-     Number.isInteger(message[8]) && ((message[8] >= 0 && message[8] <= 25) || message[8] === 117 || message[8] === 126) && message[9] === 247);
+     Number.isInteger(message[8]) && ((message[8] >= 0 && message[8] <= 25) || message[8] === 117 || (message[8] >= 124 && message[8] <= 127)) && message[9] === 247);
 }
 export function decodeCodecStatus(value) {
   if (!Number.isInteger(value) || value < 0 || value > 0xffffffff || value >>> 24 !== 0xc1 || ((value >>> 16) & 255) > 15)

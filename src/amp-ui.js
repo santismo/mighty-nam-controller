@@ -1,6 +1,7 @@
-import {STOCK_AMPS,stockAmpChoices,validFx} from './fx.js?v=0.11.0';
+import {STOCK_AMPS,stockAmpChoices,validFx} from './fx.js?v=0.11.1';
 export const isAmp=(id,fx)=>[11,12].includes(id)&&fx?.[(id-11)*16]===8;
 export const ampModel=(id,fx)=>isAmp(id,fx)?STOCK_AMPS.find(a=>a.value===fx[(id-11)*16+3])?.label??'Choose amp':null;
+export const ampUnavailable=state=>state?.identity==='NAMLNK30'&&!state.stockAmp?'Amp needs the corrected NAMLNK30 firmware. Update with revision 2, then reconnect.':null;
 export function ampSlot(fx,visible,state){
  if(!fx||!state?.stockAmp||!stockAmpChoices(state).length)return null;
  const existing=[11,12].find(id=>isAmp(id,fx));
