@@ -1,10 +1,11 @@
-import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.11.1';
-import { fxRequest, fxReply } from './fx.js?v=0.11.1';
-import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.11.1';
+import {processingProblem} from './health.js?v=0.11.2';
+import { ReplyPages, isReplyPage } from './reply-pages.js?v=0.11.2';
+import { fxRequest, fxReply } from './fx.js?v=0.11.2';
+import { encodeSysEx, SysExDecoder, notificationBytes } from './ble-midi.js?v=0.11.2';
 import { MIDI_SERVICE, MIDI_CHARACTERISTIC, IDENTITY_REQUEST, CHAIN_REQUEST,
-  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.11.1';
-import { allowedCommand } from './commands.js?v=0.11.1';
-import { validateEffects } from './controls.js?v=0.11.1';
+  pageRequest, parseIdentity, parsePage, chainParser, decodeSnapshot, decodeCodecStatus } from './protocol.js?v=0.11.2';
+import { allowedCommand } from './commands.js?v=0.11.2';
+import { validateEffects } from './controls.js?v=0.11.2';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const errorText = error => `${error?.name || 'Error'}: ${error?.message || String(error)}`.slice(0, 220);
@@ -15,7 +16,7 @@ export class PlugConnection extends EventTarget {
     super(); this.bluetooth = bluetooth; this.timeout = timeout; this.settle = settle; this.spacing = spacing;
     this.epoch = 0; this.pending = null; this.busy = false; this.device = null; this.characteristic = null;
     this.ready = false; this.writeStalled = false; this.writeMethod = null; this.lastWrite = 0;
-    this.current = null; this.lastDevice = null;
+    this.current = null; this.lastDevice = null; this.controlHistory=[]; this.lastFailure=null; this.faultDetails=null;
     this.log = []; this.stage = 'Idle'; this.notifications = 0; this.frames = 0; this.started = Date.now();
     this.decoder = new SysExDecoder(message => this.receive(message));
     this.onValue = event => {
@@ -34,12 +35,22 @@ export class PlugConnection extends EventTarget {
     if (this.log.length > 90) this.log.shift();
     this.dispatchEvent(new Event('diagnostic'));
   }
+  rememberControl(message,label) {
+    const compact=message[0]===176||message[4]===13||['F','G','V','B','A'].some(c=>message[7]===c.charCodeAt(0));
+    const state=this.current;
+    this.controlHistory.push(`${((Date.now()-this.started)/1000).toFixed(2)}s ${label}; before faults=${state?.faults??'unknown'}, running=${state?.running??'unknown'}, color=${state?.active??'unknown'}${compact?`; MIDI ${hex(message)}`:''}`);
+    if(this.controlHistory.length>12)this.controlHistory.shift();
+  }
+  failure(error) {
+    this.lastFailure=`${((Date.now()-this.started)/1000).toFixed(2)}s ${error?.message??String(error)}`;
+    this.record(`Operation failed: ${error?.message??String(error)}`);
+  }
   progress(stage) { this.stage = stage; this.record(stage); this.dispatchEvent(new Event('progress')); }
   report() {
     const s=this.current;
     const summary=s?`Firmware: ${s.identity}\nConfirmed buffer: ${s.buffer} samples at ${s.sampleRate} Hz\nBuffer scope: ${s.globalBuffer?'Global · saved on plug':'Per preset'}${s.bufferStorageError?' · storage error':''}\nActive color index: ${s.active}; capture CRC: ${s.modelCrc}; faults: ${s.faults}\nOutput: ${s.listening?'on':'muted'}; settling: ${s.settling}\nLive stock effects: ${s.effects.join(',')}\nLive FX A/B: ${s.fx?.join(',')??'unavailable'}\n`:'';
     const codec=s?.codec?`Converter startup: ${s.codec.verified?'short-delay setting verified':'setting unverified'}; ${s.codec.raw.toString(16)}\n`:'';
-    return `mighty-nam controller 0.11.1\n${summary}${codec}${s?`Stock amp capability: ${s.stockAmp?'available':'unavailable'}; response ${s.stockAmpCapability?.error??'unknown'} / ${(s.stockAmpCapability?.value??0).toString(16)}; revision ${(s.firmwareRevision??0).toString(16)}\n`:''}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${this.log.join('\n')}`;
+    return `mighty-nam controller 0.11.2\n${summary}${codec}${s?`Stock amp capability: ${s.stockAmp?'available':'unavailable'}; response ${s.stockAmpCapability?.error??'unknown'} / ${(s.stockAmpCapability?.value??0).toString(16)}; revision ${(s.firmwareRevision??0).toString(16)}\n`:''}Bluetooth: ${this.connected ? 'connected' : 'disconnected'}\nStage: ${this.stage}\nNotifications: ${this.notifications}; MIDI replies: ${this.frames}\n${s?.faultDetails?`Processing diagnostics: ${JSON.stringify(s.faultDetails)}\n`:''}${this.lastFailure?`Last operation error: ${this.lastFailure}\n`:''}${this.controlHistory.length?`Recent control commands (retained across Refresh):\n${this.controlHistory.join('\n')}\n`:''}${this.log.join('\n')}`;
   }
   assertSession(epoch) { if (epoch !== this.epoch) throw new Error('Connection closed.'); }
   async reconnect(){
@@ -50,6 +61,7 @@ export class PlugConnection extends EventTarget {
     if (this.busy || this.connected) throw new Error('A connection is already active.');
     if (!this.bluetooth?.requestDevice) throw new Error('Open this page in Bluefy on iPhone.');
     this.busy = true; const epoch = ++this.epoch;
+    this.controlHistory=[];this.lastFailure=null;this.faultDetails=null;
     this.log = []; this.notifications = 0; this.frames = 0; this.started = Date.now(); this.writeStalled = false;
     this.writeMethod = null; this.lastWrite = 0;
     try {
@@ -143,6 +155,7 @@ export class PlugConnection extends EventTarget {
     if (!this.connected) throw new Error('Plug disconnected.');
     if (this.pending) throw new Error('A read is already in progress.');
     if (this.writeStalled) throw new Error('A Bluetooth write did not finish. Disconnect and reconnect before retrying.');
+    if(mutation)this.rememberControl(message,label);
     const epoch = this.epoch, characteristic = this.characteristic;
     this.decoder.reset(); this.progress(label);
     return new Promise((resolve, reject) => {
@@ -213,7 +226,17 @@ export class PlugConnection extends EventTarget {
     }
     state.stockAmp=false;state.stockAmpModels=[];if(['NAMLNK29','NAMLNK30'].includes(identity)){const cap=await this.request(pageRequest(126),m=>parsePage(m,126),'Reading stock amp capability');state.stockAmpCapability=cap;state.stockAmp=cap.error===0&&[0x53540105,0x5354011d].includes(cap.value);state.stockAmpModels=!state.stockAmp?[]:cap.value===0x53540105?[1,26,27,28,29]:Array.from({length:29},(_,i)=>i+1);}
     if(identity==='NAMLNK30'&&state.stockAmp){const revision=await this.request(pageRequest(127),m=>parsePage(m,127),'Reading firmware revision');state.firmwareRevision=revision.error?null:revision.value;}
-    this.current = state; this.progress('Ready'); return state;
+    if(processingProblem(state)){
+      const counts=[words[4],words[10]];
+      if(!this.faultDetails||this.faultDetails.counts.some((v,i)=>v!==counts[i])){
+        const details={counts,processingFaults:words[4],contextRejections:words[10],timerMax:null};
+        try{details.timerMax=await this.readPage(8);}catch(error){details.readError=error.message;}
+        // timerMax is the firmware's raw GPT guard value, not a latency measurement.
+        this.faultDetails=details;
+      }
+      state.faultDetails={...this.faultDetails};
+    }else this.faultDetails=null;
+    this.current = state; this.progress(processingProblem(state)?'Processing stopped — restart plug':'Ready'); return state;
   }
   async refresh() {
     if (this.busy) throw new Error('A read is already in progress.');

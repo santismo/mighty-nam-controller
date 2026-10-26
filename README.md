@@ -1,8 +1,12 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.11.1) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.11.2) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
+
+## 0.11.2
+
+Reorder checks stop further edits if the firmware reports a processing fault. The page shows a restart instruction instead of Ready or a generic edit mismatch. Connection details retain recent control commands and the last error across Refresh, and include the firmware's raw maximum timer value on a fault. These diagnostics do not reset faults, retry writes, change volume, or enable output. No firmware update is required for the controller changes; the cause of the reported physical IR-reorder fault remains under investigation.
 
 ## 0.11.1
 

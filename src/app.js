@@ -1,18 +1,19 @@
-import {isAmp,ampModel,ampSlot,configureAmp,ampUnavailable} from './amp-ui.js?v=0.11.1';
-import {ControllerPages} from './pages.js?v=0.11.1';
-import {LooperPanel} from './looper-panel.js?v=0.11.1';
-import {hasLooper} from './looper.js?v=0.11.1';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.1';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.1';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.1';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.1';
-import { PlugConnection } from './device.js?v=0.11.1';
-import { PlugEditor } from './editor.js?v=0.11.1';
-import { LiveEdits } from './live.js?v=0.11.1';
-import { AutoTuner } from './auto-tuner.js?v=0.11.1';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.1';
-import { nameBytes } from './commands.js?v=0.11.1';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.1';
+import {processingProblem} from './health.js?v=0.11.2';
+import {isAmp,ampModel,ampSlot,configureAmp,ampUnavailable} from './amp-ui.js?v=0.11.2';
+import {ControllerPages} from './pages.js?v=0.11.2';
+import {LooperPanel} from './looper-panel.js?v=0.11.2';
+import {hasLooper} from './looper.js?v=0.11.2';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.2';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.2';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.2';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.2';
+import { PlugConnection } from './device.js?v=0.11.2';
+import { PlugEditor } from './editor.js?v=0.11.2';
+import { LiveEdits } from './live.js?v=0.11.2';
+import { AutoTuner } from './auto-tuner.js?v=0.11.2';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.2';
+import { nameBytes } from './commands.js?v=0.11.2';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.2';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -47,7 +48,7 @@ const live=new LiveEdits(editor,{
   beforeSend:()=>looper.whenIdle(),
   changed:()=>status(),
   accepted:state=>{snapshot=state;message('Applied');status();},
-  failed:error=>{needsRefresh=true;message(error.message,true);render();}
+  failed:error=>{needsRefresh=true;if(connection.current){snapshot=connection.current;effects=[...snapshot.effects];fx=snapshot.fx?[...snapshot.fx]:null;buffer=snapshot.buffer;}message(error.message,true);render();}
 });
 const looper=new LooperPanel({connection,bindNavigation:false,canRun:()=>online()&&hasLooper(snapshot?.identity)&&!busy&&!tuning&&!live.pending&&!needsRefresh&&!connection.pending&&!$('tuner-dialog').open,onBusy:value=>{loopBusy=value;status();}});
 const pages=new ControllerPages({
@@ -77,11 +78,11 @@ const compact=()=>supportsActiveChain(snapshot?.identity);
 const shown=()=>effects?visibleOrder(effects,fx,snapshot?.identity,retained):[];
 const pickVisible=()=>{if(compact()&&!shown().includes(selected))selected=shown()[0]??0;};
 const online=()=>Boolean(snapshot&&connection.connected);
-const canEdit=()=>online()&&!busy&&!loopBusy&&!tuning&&!needsRefresh&&!connection.writeStalled&&!$('tuner-dialog').open;
+const canEdit=()=>online()&&!processingProblem(snapshot)&&!busy&&!loopBusy&&!tuning&&!needsRefresh&&!connection.writeStalled&&!$('tuner-dialog').open;
 const locked=()=>busy||live.pending||tuning||loopBusy;
 function el(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
 function button(text,fn,label){const node=el('button',text);node.type='button';if(label)node.setAttribute('aria-label',label);node.addEventListener('click',fn);return node;}
-function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);if(error&&connection.log.length)$('connection-details').open=true;}
+function message(text,error=false){const stopped=processingProblem(snapshot);if(stopped){text=stopped;error=true;}$('message').textContent=text;$('message').classList.toggle('error',error);if(error&&connection.log.length)$('connection-details').open=true;}
 function diagnostics(){$('connection-details').hidden=!connection.log.length;if($('connection-details').open)$('diagnostics-text').value=connection.report();}
 $('connection-details').addEventListener('toggle',diagnostics);
 function savedMatches(){
@@ -98,7 +99,7 @@ function status(){
   $('preset-hint').hidden=!ready||occupied.length!==1;
   $('preset-hint').textContent=occupied.length===1?`Only ${COLORS[occupied[0].slot]} is saved onboard. Save another color to cycle with the plug button.`:'';
   $('active-preset').textContent=ready?COLORS[snapshot.active]??'Unsaved':'—';
-  $('save-state').textContent=!ready?'Offline':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
+  $('save-state').textContent=!ready?'Offline':processingProblem(snapshot)?'Restart plug':needsRefresh?'Refresh needed':live.pending?'Applying live…':editor.largeReplies===false?'Live · save unavailable':savedMatches()?'Saved on plug':'Live · not saved';
   $('save').disabled=!canEdit()||waiting||editor.largeReplies!==true||(!activeCapture&&!editor.bank[snapshot?.active]?.occupied);
   $('preset-name').disabled=!canEdit()||waiting||editor.largeReplies!==true;
   $('usb-record-control').hidden=!['NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(snapshot?.identity);$('usb-record-gain').disabled=!canEdit();$('usb-record-gain').value=effects?readRecord(effects)[0]:48;$('usb-record-value').textContent=effects?`${((readRecord(effects)[0]-48)/2).toFixed(1)} dB`:'—';
@@ -116,7 +117,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.11.1 · ${snapshot.identity}`:'0.11.1';
+  $('version').textContent=ready?`0.11.2 · ${snapshot.identity}`:'0.11.2';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=busy||live.pending||loopBusy;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -205,7 +206,7 @@ function edit(change,redraw=true){
 function move(id,to){edit(next=>{const order=fullOrder(next,fx),from=order.indexOf(id),dest=order.indexOf(to);order.splice(from,1);order.splice(dest,0,id);const changed=reorder(next,fx,order);next.splice(0,128,...changed.effects);fx=changed.fx;});}
 async function work(label,action){
   if(locked())return;busy=true;const ticket=++operation;message(label);status();
-  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;connection.record(`Operation failed: ${error.message}`);message(error.message,true);}}
+  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;connection.failure(error);message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();if(looper.open)looper.run();}}
 }
 function clear(){pages.reset();looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}

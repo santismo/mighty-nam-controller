@@ -1,13 +1,14 @@
-import {Looper,hasLooper} from './looper.js?v=0.11.1';
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.11.1';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.11.1';
-import { fxRequest, fxReply } from './fx.js?v=0.11.1';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.11.1';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.11.1';
-import { detectPitch, pitchReading } from './tuner.js?v=0.11.1';
-import { modelPacket,modelReply } from './model-wire.js?v=0.11.1';
-import { validateModel,includesCab } from './model.js?v=0.11.1';
-import { put,crc32,nameBytes } from './commands.js?v=0.11.1';
+import {requireProcessing} from './health.js?v=0.11.2';
+import {Looper,hasLooper} from './looper.js?v=0.11.2';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.11.2';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.11.2';
+import { fxRequest, fxReply } from './fx.js?v=0.11.2';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.11.2';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.11.2';
+import { detectPitch, pitchReading } from './tuner.js?v=0.11.2';
+import { modelPacket,modelReply } from './model-wire.js?v=0.11.2';
+import { validateModel,includesCab } from './model.js?v=0.11.2';
+import { put,crc32,nameBytes } from './commands.js?v=0.11.2';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -20,7 +21,7 @@ export class PlugEditor {
     if(this.link.busy)throw new Error('Wait for the current operation.');
     if(!this.link.connected||!this.link.current)throw new Error('Connect and read the plug first.');
     this.link.busy=true;const epoch=this.link.epoch;
-    try{return await action();}finally{if(epoch===this.link.epoch)this.link.busy=false;}
+    try{return await action();}catch(error){this.link.failure?.(error);throw error;}finally{if(epoch===this.link.epoch)this.link.busy=false;}
   }
   async requireWritableLoop(){
     if(hasLooper(this.link.current?.identity)){
@@ -89,11 +90,16 @@ export class PlugEditor {
   });}
   async current(expected){
     const now=await this.link.snapshot();
+    requireProcessing(now);
     if(now.active!==expected.active||now.modelCrc!==expected.modelCrc||now.buffer!==expected.buffer||!same(now.effects,expected.effects)||(expected.fx&&!same(now.fx,expected.fx)))throw new Error('The plug changed since this page was read. Refresh before applying edits.');
-    if(now.faults||!now.running)throw new Error('The plug is not processing normally. Restart it before editing.');
+    if(!now.running)throw new Error('Load a capture before editing the signal chain.');
     return now;
   }
   async send(message,label){await this.link.request(message,null,label,{mutation:true});}
+  async checkProcessing(){
+    const faults=await this.link.readPage(4),running=await this.link.readPage(9);
+    if(faults||!running)requireProcessing(await this.link.snapshot());
+  }
   async preserveOutput(state,expectedListening){
     // Resume only after all operation-specific model/control checks passed.
     if(state.listening===expectedListening)return state;
@@ -107,11 +113,11 @@ export class PlugEditor {
   async applyInternal(expected,effects,buffer){
     validateEffects(effects,expected.identity);if(![8,16,32].includes(buffer))throw new Error('Invalid buffer.');
     const plan=editPlan(expected.effects,effects,expected.identity);const before=await this.current(expected);
-    for(const message of plan)await this.send(message,'Applying signal chain');
+    for(const message of plan){await this.send(message,'Applying signal chain');if(message[0]===240)await this.checkProcessing();}
     if(!same(readNam(expected.effects),readNam(effects)))await this.nam(before,effects);
     if(effects[34]===2&&!same(expected.effects.slice(33,36),effects.slice(33,36)))await this.recording(before,effects);
     if(buffer!==expected.buffer)await this.send(bufferCommand(buffer),'Changing buffer');
-    await pause(150);const result=await this.link.snapshot();
+    await pause(150);const result=await this.link.snapshot();requireProcessing(result);
     if(result.active!==expected.active||result.modelCrc!==expected.modelCrc||result.buffer!==buffer||!same(result.effects,effects)||result.faults||!result.running)throw new Error('The edited chain was not confirmed. Refresh before trying again.');
     if(result.bufferStorageError)throw new Error('The global buffer was not saved. Refresh before retrying.');
     return this.syncGlobalBuffer(await this.preserveOutput(result,before.listening));
@@ -140,11 +146,11 @@ export class PlugEditor {
           if(command[0]===240)await pause(80);
           await this.send(command,'Applying live control');
           if(command[0]===176)effects[command[1]<=9?command[1]:parameterIndex(command[1])]=command[2];
-          else effects.splice(90,9,...command.slice(7,16));
+          else {effects.splice(90,9,...command.slice(7,16));await this.checkProcessing();}
         }else if(fx&&!same(fx,target.fx)){const reply=await this.fx(1,state.active,target.fx,state.modelCrc);if(reply.active!==state.active||!same(reply.config,target.fx))throw new Error('FX readback did not match.');fx=[...reply.config];}else{await this.send(bufferCommand(target.buffer),'Changing buffer');buffer=target.buffer;}
         continue;
       }
-      await pause(100);state=await this.link.snapshot();lastGuard=Date.now();
+      await pause(100);state=await this.link.snapshot();lastGuard=Date.now();requireProcessing(state);
       if(state.active!==expected.active||state.modelCrc!==expected.modelCrc||state.buffer!==buffer||!same(state.effects,effects)||(fx&&!same(state.fx,fx))||state.faults||!state.running)
         throw new Error('Live changes were not confirmed. Refresh before editing again.');
       const next=latest();if(same(next.effects,effects)&&next.buffer===buffer&&(!fx||same(next.fx,fx))){if(state.bufferStorageError)throw new Error('The global buffer was not saved. Refresh before retrying.');return this.syncGlobalBuffer(await this.preserveOutput(state,wasListening));}
