@@ -46,3 +46,22 @@ test('IR left/right moves preserve type, bypass, settings and playback on 29 and
   }finally{link.close();}
  }
 });
+test('recall timing fault keeps the actual color and restart diagnosis through bank refresh',async()=>{
+ const fake=editingBluetooth({identity:'NAMLNK30',onPreset(op,slot,{words}){if(op===3&&slot===3){words[4]=1;words[9]=0;words[23]=2;words[8]=150;}}});
+ const link=new PlugConnection(fake.bluetooth,500,0,0),editor=new PlugEditor(link);
+ try{
+  await link.connect();
+  await assert.rejects(editor.recall(3),e=>e.code==='processing-stopped'&&/POWER only/.test(e.message));
+  assert.equal(link.current.active,3);assert.equal(link.current.faultDetails.timerMax,150);
+  assert.equal(link.current.listening,false);assert.match(link.stage,/Processing stopped/);
+  await editor.readBank();assert.equal(editor.bank.filter(p=>p.occupied).length,7);
+  assert.match(link.stage,/Processing stopped/);assert.match(link.report(),/Last operation error:.*stopped audio processing/);
+  assert.equal(fake.requests.filter(m=>m[7]===65).length,0);assert.equal(fake.saveCount,0);
+  const sent=fake.requests.length;
+  await assert.rejects(editor.recall(0),e=>e.code==='processing-stopped');
+  assert.equal(fake.requests.slice(sent).filter(m=>m[7]===83).length,0);
+  fake.words[4]=0;fake.words[9]=1;fake.words[23]=1;
+  await link.refresh();const state=await editor.recall(0);assert.equal(state.active,0);assert.equal(state.faults,0);
+  await editor.readBank();assert.equal(link.stage,'Ready');
+ }finally{link.close();}
+});

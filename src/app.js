@@ -1,19 +1,19 @@
-import {processingProblem} from './health.js?v=0.11.2';
-import {isAmp,ampModel,ampSlot,configureAmp,ampUnavailable} from './amp-ui.js?v=0.11.2';
-import {ControllerPages} from './pages.js?v=0.11.2';
-import {LooperPanel} from './looper-panel.js?v=0.11.2';
-import {hasLooper} from './looper.js?v=0.11.2';
-import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.2';
-import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.2';
-import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.2';
-import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.2';
-import { PlugConnection } from './device.js?v=0.11.2';
-import { PlugEditor } from './editor.js?v=0.11.2';
-import { LiveEdits } from './live.js?v=0.11.2';
-import { AutoTuner } from './auto-tuner.js?v=0.11.2';
-import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.2';
-import { nameBytes } from './commands.js?v=0.11.2';
-import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.2';
+import {processingProblem} from './health.js?v=0.11.3';
+import {isAmp,ampModel,ampSlot,configureAmp,ampUnavailable} from './amp-ui.js?v=0.11.3';
+import {ControllerPages} from './pages.js?v=0.11.3';
+import {LooperPanel} from './looper-panel.js?v=0.11.3';
+import {hasLooper} from './looper.js?v=0.11.3';
+import {readNam as readRecord,putNam as putRecord} from './usb-record.js?v=0.11.3';
+import { readNam, putNam, namParameters } from './nam-controls.js?v=0.11.3';
+import { supportsActiveChain, visibleOrder, membership, enabled, ChainView, replaceBlock } from './active-chain.js?v=0.11.3';
+import { FX_MODES, fxControls, fullOrder, reorder } from './fx.js?v=0.11.3';
+import { PlugConnection } from './device.js?v=0.11.3';
+import { PlugEditor } from './editor.js?v=0.11.3';
+import { LiveEdits } from './live.js?v=0.11.3';
+import { AutoTuner } from './auto-tuner.js?v=0.11.3';
+import { COLORS, effectChoices, chosenEffect, changeType, same } from './controls.js?v=0.11.3';
+import { nameBytes } from './commands.js?v=0.11.3';
+import { ToneBrowser, captureName, shortPresetName } from './tone-browser.js?v=0.11.3';
 const $=id=>document.getElementById(id);
 const connection=new PlugConnection(navigator.bluetooth),editor=new PlugEditor(connection,{recoveryStorage:sessionStorage});
 const effectColors={1:'comp',2:'drive',3:'nam',4:'eq',5:'gate',6:'mod',7:'delay',8:'reverb',9:'cab',11:'fxa',12:'fxb'};
@@ -117,7 +117,7 @@ function status(){
   $('output').textContent=ready?snapshot.settling?'Settling':snapshot.listening?'On':'Muted':'—';
   $('model').textContent=ready?snapshot.loaded?'Loaded':'Empty':'—';
   $('health').textContent=ready?snapshot.faults?'Fault reported':'Ready':'—';
-  $('version').textContent=ready?`0.11.2 · ${snapshot.identity}`:'0.11.2';
+  $('version').textContent=ready?`0.11.3 · ${snapshot.identity}`:'0.11.3';
   for(const node of $('presets').querySelectorAll('button'))node.disabled=!canEdit()||waiting;
   for(const node of $('block-detail').querySelectorAll('button,input,select'))node.disabled=!canEdit();
   $('open-captures').disabled=busy||live.pending||loopBusy;$('nam-browse').disabled=waiting;$('nam-favorite').disabled=waiting;tones.controls();
@@ -206,7 +206,7 @@ function edit(change,redraw=true){
 function move(id,to){edit(next=>{const order=fullOrder(next,fx),from=order.indexOf(id),dest=order.indexOf(to);order.splice(from,1);order.splice(dest,0,id);const changed=reorder(next,fx,order);next.splice(0,128,...changed.effects);fx=changed.fx;});}
 async function work(label,action){
   if(locked())return;busy=true;const ticket=++operation;message(label);status();
-  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){needsRefresh=true;connection.failure(error);message(error.message,true);}}
+  try{await looper.whenIdle();if(ticket!==operation)return;await action();}catch(error){if(ticket===operation){if(connection.current&&connection.current!==snapshot)accept(connection.current,true);needsRefresh=true;connection.failure(error);message(error.message,true);}}
   finally{if(ticket===operation){busy=false;render();if(looper.open)looper.run();}}
 }
 function clear(){pages.reset();looper.close();tunerResume=null;autoTuner.stop();operation++;loadTicket++;activeTicket++;activeCapture=null;editor.activeCapture=null;busy=false;viewSlot=null;retained=[];snapshot=null;effects=null;fx=null;needsRefresh=false;editor.resetBank();live.reset(null);connection.close();$('preset-name').value='';$('effect-dialog').close();$('add-block-dialog').close();$('tuner-dialog').close();render();}

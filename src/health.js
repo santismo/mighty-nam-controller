@@ -7,3 +7,6 @@ export function requireProcessing(state) {
   const message=processingProblem(state);
   if(message)throw Object.assign(new Error(message),{code:'processing-stopped'});
 }
+export function processingStage(state, ready='Ready') {
+  return processingProblem(state)?'Processing stopped — restart plug':ready;
+}

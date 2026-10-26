@@ -1,14 +1,14 @@
-import {requireProcessing} from './health.js?v=0.11.2';
-import {Looper,hasLooper} from './looper.js?v=0.11.2';
-import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.11.2';
-import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.11.2';
-import { fxRequest, fxReply } from './fx.js?v=0.11.2';
-import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.11.2';
-import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.11.2';
-import { detectPitch, pitchReading } from './tuner.js?v=0.11.2';
-import { modelPacket,modelReply } from './model-wire.js?v=0.11.2';
-import { validateModel,includesCab } from './model.js?v=0.11.2';
-import { put,crc32,nameBytes } from './commands.js?v=0.11.2';
+import {requireProcessing,processingStage} from './health.js?v=0.11.3';
+import {Looper,hasLooper} from './looper.js?v=0.11.3';
+import {namRequest as recordRequest,namReply as recordReply,readNam as readRecord} from './usb-record.js?v=0.11.3';
+import { namRequest, namReply, readNam, putNam } from './nam-controls.js?v=0.11.3';
+import { fxRequest, fxReply } from './fx.js?v=0.11.3';
+import { same, validateEffects, editPlan, parameterIndex } from './controls.js?v=0.11.3';
+import { presetRequest,presetReply,saveBody,listenCommand,bufferCommand,tunerRequest,tunerReply,compactTunerRequest,compactTunerReply } from './commands.js?v=0.11.3';
+import { detectPitch, pitchReading } from './tuner.js?v=0.11.3';
+import { modelPacket,modelReply } from './model-wire.js?v=0.11.3';
+import { validateModel,includesCab } from './model.js?v=0.11.3';
+import { put,crc32,nameBytes } from './commands.js?v=0.11.3';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 export class PlugEditor {
   constructor(link,{recoveryStorage=null}={}){this.recoveryStorage=recoveryStorage;this.link=link;this.resetBank();this.nonce=(Date.now()>>>0)||1;}
@@ -75,7 +75,7 @@ export class PlugEditor {
     this.resetBank();
     try{
       for(let slot=0;slot<7;slot++)await this.preset(1,slot);
-      this.largeReplies=true;this.link.progress('Ready');return this.bank;
+      this.largeReplies=true;this.link.progress(processingStage(this.link.current));return this.bank;
     }catch(error){
       this.bank=[];
       if(!['reply-timeout','large-reply-truncated'].includes(error.code)||!this.link.connected||this.link.writeStalled)throw error;
@@ -85,7 +85,7 @@ export class PlugEditor {
       // preset again before allowing live controls to continue.
       await this.link.snapshot();
       this.bankWarning='Saved preset details could not be read. You can still adjust effects, buffer, and output. Use the plug’s preset button, then Refresh. Saving and tuner are unavailable in this session; use the Mac app.';
-      this.link.progress('Ready — live controls');return null;
+      this.link.progress(processingStage(this.link.current,'Ready — live controls'));return null;
     }
   });}
   async current(expected){
@@ -158,8 +158,10 @@ export class PlugEditor {
   });}
   recall(slot){return this.run(async()=>{
     this.requireLargeReplies();
+    await this.checkProcessing();
     const meta=await this.preset(1,slot);if(!meta.occupied)throw new Error('This preset is empty.');
     const recalled=await this.preset(3,slot),state=await this.link.snapshot();
+    requireProcessing(state);
     if(recalled.active!==slot||state.active!==slot||state.modelCrc!==recalled.modelCrc||state.buffer!==recalled.buffer||!same(state.effects,recalled.effects)||state.faults||!state.running)throw new Error('Preset recall was not confirmed. Refresh the plug.');
     if(state.fx&&!same(state.fx,recalled.fx))throw new Error('Recalled FX settings did not match.');
     return state;

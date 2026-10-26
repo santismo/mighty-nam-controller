@@ -1,8 +1,12 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.11.2) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.11.3) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
+
+## 0.11.3
+
+Preset recall now reports a latched processing fault directly and keeps the observed color and stopped state on screen. Reading the saved preset bank no longer overwrites that state with Ready. A failed recall is not retried or saved, and the page does not change output to clear a fault. These UI fixes do not resolve the firmware timing overrun.
 
 ## 0.11.2
 
