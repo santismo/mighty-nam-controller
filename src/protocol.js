@@ -6,14 +6,14 @@ const prefix = [240, 67, 88, 112, 4, 2];
 const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 const starts = (a, b) => b.every((x, i) => x === a[i]);
 export const pageRequest = page => {
-  if (!Number.isInteger(page) || page < 0 || (page > 25 && page !== 117 && (page < 124 || page > 127))) throw new Error('Invalid status page');
+  if (!Number.isInteger(page) || page < 0 || (page > 25 && page !== 117)) throw new Error('Invalid status page');
   return [...prefix, 78, 80, page, 247];
 };
 // Status-only allowlist. Typed editor commands are separately bounded in commands.js.
 export function isReadOnlyRequest(message) {
   return same(message, IDENTITY_REQUEST) || same(message, CHAIN_REQUEST) ||
     (message.length === 10 && starts(message, [...prefix, 78, 80]) &&
-     Number.isInteger(message[8]) && ((message[8] >= 0 && message[8] <= 25) || message[8] === 117 || (message[8] >= 124 && message[8] <= 127)) && message[9] === 247);
+     Number.isInteger(message[8]) && ((message[8] >= 0 && message[8] <= 25) || message[8] === 117) && message[9] === 247);
 }
 export function decodeCodecStatus(value) {
   if (!Number.isInteger(value) || value < 0 || value > 0xffffffff || value >>> 24 !== 0xc1 || ((value >>> 16) & 255) > 15)
@@ -64,10 +64,10 @@ export function decodeSnapshot(words, chain, identity) {
   if ([0, 1, 2, 4, 5, 9, 10, 23, 24, 25].some(page =>
     !Number.isInteger(words[page]) || words[page] < 0 || words[page] > 0xffffffff))
     throw new Error('The plug returned an incomplete status.');
-  if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(identity) || words[0] !== 0x4e4c4b31 || words[1] !== 1 || words[2] !== 1)
+  if (!['NAMLNK12','NAMLNK13','NAMLNK14','NAMLNK15','NAMLNK16', 'NAMLNK17','NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity) || words[0] !== 0x4e4c4b31 || words[1] !== 1 || words[2] !== 1)
     throw new Error('The plug returned an unsupported status.');
   const listen = words[23], buffer = words[24], bank = words[25];
-  const globalBuffer=['NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29','NAMLNK30'].includes(identity),format=(buffer>>>8)&255,bufferStorageError=globalBuffer?format>>>4:0;
+  const globalBuffer=['NAMLNK18','NAMLNK19','NAMLNK20', 'NAMLNK21','NAMLNK22','NAMLNK23', 'NAMLNK24', 'NAMLNK25', 'NAMLNK26', 'NAMLNK27','NAMLNK28','NAMLNK29'].includes(identity),format=(buffer>>>8)&255,bufferStorageError=globalBuffer?format>>>4:0;
   if ((listen & ~7) !== 0 || (listen & 6) === 6 || ((listen & 4) !== 0 && !(listen & 1)) ||
       (buffer >>> 16) !== 48000 || (globalBuffer?((format&15)!==2||bufferStorageError>4):format!==1) || ![8, 16, 32].includes(buffer & 255) ||
       (bank >>> 24) !== 1 || (bank & 0x00ff0000) !== 0 || ((bank >>> 8) & 255) > 127 ||

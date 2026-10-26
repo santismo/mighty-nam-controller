@@ -1,5 +1,5 @@
-import { A2_TOPOLOGY } from './a2-topology.js?v=0.11.3';
-import { crc32,word,put } from './commands.js?v=0.11.3';
+import { A2_TOPOLOGY } from './a2-topology.js?v=0.11.4';
+import { crc32,word,put } from './commands.js?v=0.11.4';
 export const MAX_NAM_BYTES=4*1024*1024;
 export async function sha256(bytes){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');}
 function equal(a,b){if(a===b)return true;if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;const keys=Object.keys(a);return keys.length===Object.keys(b).length&&keys.every(k=>Object.hasOwn(b,k)&&equal(a[k],b[k]));}

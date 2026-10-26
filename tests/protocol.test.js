@@ -4,7 +4,7 @@ import { IDENTITY_REQUEST, CHAIN_REQUEST, pageRequest, isReadOnlyRequest, parseI
 import { identityFrame, pageFrame, chainFrame, chainParts, statusWords } from './fixtures.js';
 
 test('outbound allowlist permits only exact read queries', () => {
-  const allowed = [IDENTITY_REQUEST, CHAIN_REQUEST, ...[117,124,125,126,127].map(pageRequest), ...Array.from({ length: 26 }, (_, p) => pageRequest(p))];
+  const allowed = [IDENTITY_REQUEST, CHAIN_REQUEST, pageRequest(117), ...Array.from({ length: 26 }, (_, p) => pageRequest(p))];
   for (const message of allowed) {
     assert.ok(isReadOnlyRequest(message));
     for (let i = 0; i < message.length; i++) for (const value of [0, 1, 63, 127, 128, 247, 255]) {

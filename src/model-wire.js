@@ -1,5 +1,5 @@
 // A2 Lite RAM-model messages only. No firmware updater or raw-memory commands.
-import { crc32,word,put,pack7,unpack7 } from './commands.js?v=0.11.3';
+import { crc32,word,put,pack7,unpack7 } from './commands.js?v=0.11.4';
 const PREFIX=[240,67,88,112,4,2,78,76,1];
 export function modelPacket(op,session=0,offset=0,data=[]){
   if(![1,2,3,4,5,6].includes(op)||!Number.isInteger(session)||session<0||session>0xffffffff||!Number.isInteger(offset)||offset<0||offset>8192||data.length>256||data.some(b=>!Number.isInteger(b)||b<0||b>255))throw new Error('Invalid model packet.');

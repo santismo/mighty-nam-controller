@@ -1,4 +1,4 @@
-import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.11.3';
+import {Looper,hasLooper,thresholdMeter} from './looper.js?v=0.11.4';
 // A nonmodal panel lets guitar preset selection remain available between polls.
 // Shares the app's busy gate: no poll runs concurrently with a preset/model edit.
 // Avoid rewriting unchanged controls on each meter poll. WebKit visibly
