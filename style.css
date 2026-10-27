@@ -36,7 +36,7 @@ body{background:#050505}.topbar{height:76px}.brand{font-size:19px;letter-spacing
 
 #latency-note{display:none}#buffer-state{font-size:10px;margin:0}#buffer-state:empty{display:none}
 
-.block{flex:0 0 100px}.chain{gap:12px}#add-block{margin:12px 26px 0;min-height:36px;width:fit-content;font-size:12px}
+.block{flex:0 0 100px}.chain{gap:12px}
 
 .move-controls .secondary-button{font-size:12px;font-weight:500;min-width:0;padding:0 12px;white-space:nowrap}
 
@@ -116,3 +116,10 @@ body{background:#050505}.topbar{height:76px}.brand{font-size:19px;letter-spacing
 @media(max-width:760px){.track-list{grid-template-columns:1fr}}
 @media(max-width:480px){main{padding-top:4px}.page-nav{gap:3px;margin-bottom:12px}.page-nav .secondary-button{font-size:11px;padding:0 5px}.looper-panel{padding:14px}.loop-deck{grid-template-columns:120px minmax(0,1fr);gap:13px}.loop-dial{width:120px;height:120px}.dial-center{inset:15px;gap:6px}.dial-center strong{font-size:24px}.dial-center span{font-size:10px}.loop-performance>strong{font-size:13px}.loop-performance>span{font-size:10px}.looper-panel .loop-transport button{min-height:56px;padding:0 8px;font-size:12px}.loop-transport{gap:5px;margin-top:10px}.looper-panel .overdub-button{font-size:12px;min-height:52px}.loop-take{padding:10px;gap:0 8px}.track-actions{gap:4px}.track-actions .secondary-button{padding:0 6px;font-size:10px}.page-dialog{padding:16px}.page-dialog .tone-filters{grid-template-columns:1fr 1fr}.page-dialog .tone-filters select{min-width:0}.loop-recording-status{font-size:11px}}
 @media(max-width:350px){.loop-deck{grid-template-columns:98px minmax(0,1fr);gap:10px}.loop-dial{width:98px;height:98px}.dial-center strong{font-size:20px}.loop-transport{grid-template-columns:minmax(0,1fr)}.loop-transport #loop-stop{min-height:44px}.track-actions{gap:2px}.track-actions .secondary-button{padding:0 3px}}
+
+/* Chain editing stays together above the blocks, separate from effect parameters. */
+.chain-tools{display:flex;align-items:center;flex-wrap:nowrap;gap:4px;padding:12px 26px 0;overflow-x:auto;scrollbar-width:thin}
+.chain-tools button{flex:0 0 auto;margin:0;min-width:44px;min-height:44px;padding:0 7px;font-size:12px;font-weight:500;white-space:nowrap;border-radius:3px;background:transparent}
+.chain-tools #move-left,.chain-tools #move-right{width:44px;font-size:20px;line-height:1}
+@media(max-width:680px){.chain-tools{padding-inline:12px}}
+@media(max-width:360px){.chain-tools{padding-inline:8px;gap:3px}.chain-tools button{padding-inline:5px}}

@@ -1,17 +1,19 @@
 # mighty-nam controller
 
-[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.11.4) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
+[Open controller](https://santismo.github.io/mighty-nam-controller/?v=0.11.5) · [License](LICENSE) · [Notices](THIRD-PARTY-LICENSES.txt) · [Privacy](PRIVACY.md)
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
 ## Screenshots
 
-Current 0.11.4 interface with simulated connections and licensed example captures. The expanded example selects Auto Wah; the small example has NAM and reverb.
+Current 0.11.5 interface with simulated connections and licensed example captures. The expanded example selects Auto Wah; the small example has NAM and reverb.
 
-<a href="https://santismo.github.io/mighty-nam/assets/screens/phone-small.png?v=29r2"><img src="https://santismo.github.io/mighty-nam/assets/screens/phone-small.png?v=29r2" width="240" alt="NAM and reverb"></a>
-<a href="https://santismo.github.io/mighty-nam/assets/screens/phone-full.png?v=29r2"><img src="https://santismo.github.io/mighty-nam/assets/screens/phone-full.png?v=29r2" width="240" alt="Expanded chain with Auto Wah"></a>
+<a href="https://santismo.github.io/mighty-nam/assets/screens/phone-small.png?v=0.11.5"><img src="https://santismo.github.io/mighty-nam/assets/screens/phone-small.png?v=0.11.5" width="240" alt="NAM and reverb"></a>
+<a href="https://santismo.github.io/mighty-nam/assets/screens/phone-full.png?v=0.11.5"><img src="https://santismo.github.io/mighty-nam/assets/screens/phone-full.png?v=0.11.5" width="240" alt="Expanded chain with Auto Wah"></a>
 
 The [current builder](https://santismo.github.io/mighty-nam/looper-builder.html) makes NAM-only NAMLNK29 revision 2 with all seven preset colors populated and editable. It repeats three MIT-licensed starter captures; use Save to plug to replace any color. Revision 2 adds a firmware storage readback fix, with offline seven-slot coverage. No controller protocol change is required; physical confirmation is pending.
+
+Version 0.11.5 groups Add, Change, Remove and the position arrows into one compact row above the chain. These actions affect the selected block; effect parameters remain below it. No firmware update is required.
 
 ## Signal chain
 
@@ -71,7 +73,7 @@ sets Looper mode so PRESET can finish the recording.
 
 Version 0.11.4 restores the pre-stock-amp 0.10.2 interface and controls, including its page navigation and compact looper. Use NAMLNK29 or an earlier supported version. The NAMLNK30 stock-amp previews have been withdrawn.
 
-Controller **0.11.4** recognizes NAMLNK12–29 and retains each version’s supported controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–29; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
+Controller **0.11.5** recognizes NAMLNK12–29 and retains each version’s supported controls. **FX A / FX B → Auto Wah** uses the Daisy-derived algorithm on 24–29; **Drive → Touch Wah** retains the stock effect. Connection/status reads do not change playback. The controller does not install firmware.
 
 ## Looper
 

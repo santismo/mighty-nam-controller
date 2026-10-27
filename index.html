@@ -10,8 +10,8 @@
   <title>mighty-nam</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.png">
-  <link rel="stylesheet" href="./style.css?v=0.11.4">
-  <script type="module" src="./src/entry.js?v=0.11.4"></script>
+  <link rel="stylesheet" href="./style.css?v=0.11.5">
+  <script type="module" src="./src/entry.js?v=0.11.5"></script>
 </head>
 <body>
   <div class="shell">
@@ -40,14 +40,20 @@
         <div id="usb-record-control" class="master-control" hidden><label class="parameter"><span class="parameter-heading">USB recording gain <output id="usb-record-value">0.0 dB</output></span><input id="usb-record-gain" type="range" min="0" max="96" step="1" value="48" disabled aria-label="USB recording gain"></label></div>
         <div class="chain-heading"><span>Signal path</span><span id="chain-hint">Waiting for connection</span></div>
         <div id="empty-chain" class="empty-chain"><span class="jack"></span><span class="empty-line"></span><span class="empty-symbol">N</span><span class="empty-line"></span><span class="jack"></span></div>
-        <button id="add-block" class="secondary-button" hidden>Add block</button>
+        <div id="chain-tools" class="chain-tools" role="group" aria-label="Signal chain editing" hidden>
+          <button id="add-block" class="secondary-button" aria-label="Add block" title="Add block" hidden>Add</button>
+          <button id="change-block" class="secondary-button" aria-label="Change selected block" title="Change selected block" hidden>Change</button>
+          <button id="remove-block" class="secondary-button" aria-label="Remove selected block" title="Remove selected block" hidden>Remove</button>
+          <button id="move-left" class="secondary-button" aria-label="Move block left" title="Move selected block left" disabled>←</button>
+          <button id="move-right" class="secondary-button" aria-label="Move block right" title="Move selected block right" disabled>→</button>
+        </div>
         <div id="chain" class="chain" aria-label="Signal chain blocks" hidden></div>
         <section id="block-detail" class="block-detail" aria-labelledby="block-name">
           <div><span class="eyebrow">Selected block</span><h2 id="block-name">No block selected</h2></div>
           <button type="button" id="block-state" class="tag block-toggle" aria-label="Selected block enabled" aria-pressed="false" disabled>—</button>
           <p id="block-info" class="secondary"></p>
           <div id="nam-controls" class="nam-controls" hidden><div id="nam-capture"></div><div class="tone-actions"><button id="nam-browse" class="primary">Choose capture</button><button id="nam-favorite" class="secondary-button" hidden>☆ Favorite on phone</button></div></div>
-          <div class="move-controls"><button id="change-block" class="secondary-button" hidden>Change block</button><button id="remove-block" class="secondary-button" hidden>Remove</button></div><button id="choose-effect" class="effect-picker" hidden>Choose effect</button><div id="parameters" class="parameters"></div><div class="move-controls"><span class="secondary">Position</span><button id="move-left" aria-label="Move block left" disabled>←</button><button id="move-right" aria-label="Move block right" disabled>→</button></div>
+          <button id="choose-effect" class="effect-picker" hidden>Choose effect</button><div id="parameters" class="parameters"></div>
         </section>
       </section>
       <section class="device-panel" aria-label="Plug status">
@@ -139,7 +145,7 @@
       <dialog id="tuner-dialog" class="page-dialog"><div class="dialog-heading"><h2>Tuner</h2><button id="close-tuner" class="secondary-button">Close</button></div><div id="tuner-note" class="tuner-note">—</div><meter id="tuner-meter" min="-50" max="50" low="-3" high="3" optimum="0" value="0" aria-label="Pitch offset in cents"></meter><p id="tuner-reading" class="secondary" role="status">Pluck one string and let it ring.</p><p id="tuner-progress" class="secondary" role="status"></p><div class="tuner-controls"><label>A4 <select id="reference" aria-label="Tuner reference"><option value="430">430 Hz</option><option value="431">431 Hz</option><option value="432">432 Hz</option><option value="433">433 Hz</option><option value="434">434 Hz</option><option value="435">435 Hz</option><option value="436">436 Hz</option><option value="437">437 Hz</option><option value="438">438 Hz</option><option value="439">439 Hz</option><option value="440" selected>440 Hz</option><option value="441">441 Hz</option><option value="442">442 Hz</option><option value="443">443 Hz</option><option value="444">444 Hz</option><option value="445">445 Hz</option><option value="446">446 Hz</option><option value="447">447 Hz</option><option value="448">448 Hz</option><option value="449">449 Hz</option><option value="450">450 Hz</option></select></label></div></dialog>
     </main>
   <footer style="text-align:center;padding:20px;color:#8c929c;font-size:12px"><a href="https://santismo.github.io/mighty-nam/phone.html">Guide</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/santismo/mighty-nam-controller/blob/main/LEGAL.md">Legal</a></footer>
-    <footer><span id="version">0.11.4</span><a href="https://santismo.github.io/mighty-nam/builder.html" target="_blank" rel="noopener noreferrer">Firmware</a><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
+    <footer><span id="version">0.11.5</span><a href="https://santismo.github.io/mighty-nam/builder.html" target="_blank" rel="noopener noreferrer">Firmware</a><a href="https://github.com/santismo/mighty-nam-controller" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a></footer>
     <noscript>Enable JavaScript to connect.</noscript>
   </div>
 </body>
