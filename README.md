@@ -4,6 +4,15 @@
 
 A free Bluetooth controller for **mighty-nam**, by **santismo**. On iPhone, open the page in [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055), keep the plug in normal mode, and tap **Connect**. This public repository contains the web controller only. Firmware and Mac development remain in the public [mighty-nam repository](https://github.com/santismo/mighty-nam).
 
+## Screenshots
+
+Current 0.11.4 interface with simulated connections and licensed example captures. The expanded example selects Auto Wah; the small example has NAM and reverb.
+
+<a href="https://santismo.github.io/mighty-nam/assets/screens/phone-small.png?v=29r2"><img src="https://santismo.github.io/mighty-nam/assets/screens/phone-small.png?v=29r2" width="240" alt="NAM and reverb"></a>
+<a href="https://santismo.github.io/mighty-nam/assets/screens/phone-full.png?v=29r2"><img src="https://santismo.github.io/mighty-nam/assets/screens/phone-full.png?v=29r2" width="240" alt="Expanded chain with Auto Wah"></a>
+
+The [current builder](https://santismo.github.io/mighty-nam/looper-builder.html) makes NAM-only NAMLNK29 revision 2 with all seven preset colors populated and editable. It repeats three MIT-licensed starter captures; use Save to plug to replace any color. Revision 2 adds a firmware storage readback fix, with offline seven-slot coverage. No controller protocol change is required; physical confirmation is pending.
+
 ## Signal chain
 
 - Select any saved color directly. Controls apply live; **Save to plug** stores the capture, name, effects and settings after power-off.
